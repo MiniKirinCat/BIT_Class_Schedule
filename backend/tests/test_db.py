@@ -95,3 +95,40 @@ def test_snapshot_and_changes_roundtrip(tmp_path):
     assert run is not None
     assert run["status"] == "success"
     assert run["change_count"] == 1
+
+
+def test_failed_sync_run_defaults_cloud_status_to_skipped(tmp_path):
+    repo = SnapshotRepo(make_db(tmp_path))
+    sync_id = repo.record_sync_run(
+        trigger="startup",
+        started_at="2026-10-25T12:00:00+08:00",
+        finished_at=None,
+        status="running",
+    )
+    repo.finish_sync_run(
+        sync_id,
+        finished_at="2026-10-25T12:00:01+08:00",
+        status="failed",
+        error_code="LOGIN_FAILED",
+        error_message="登录失败",
+    )
+    run = repo.latest_sync_run()
+    assert run is not None
+    assert run["status"] == "failed"
+    assert run["cloud_publish_status"] == "skipped"
+
+    explicit_id = repo.record_sync_run(
+        trigger="manual",
+        started_at="2026-10-25T12:05:00+08:00",
+        finished_at=None,
+        status="running",
+    )
+    repo.finish_sync_run(
+        explicit_id,
+        finished_at="2026-10-25T12:05:01+08:00",
+        status="failed",
+        cloud_publish_status="failed",
+    )
+    run = repo.latest_sync_run()
+    assert run is not None
+    assert run["cloud_publish_status"] == "failed"

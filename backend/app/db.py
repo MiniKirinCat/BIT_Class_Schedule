@@ -140,6 +140,8 @@ class SnapshotRepo:
         error_message: str | None = None,
         cloud_publish_status: str | None = None,
     ) -> int:
+        # cloud_publish_status is never NULL; an unattempted publish is "skipped".
+        cloud_publish_status = cloud_publish_status or "skipped"
         with self.db.connect() as conn:
             cur = conn.execute(
                 "INSERT INTO sync_runs(trigger, started_at, finished_at, status, error_code, error_message, term, course_count, change_count, cloud_publish_status) "
@@ -161,6 +163,8 @@ class SnapshotRepo:
         error_message: str | None = None,
         cloud_publish_status: str | None = None,
     ) -> None:
+        # cloud_publish_status is never NULL; an unattempted publish is "skipped".
+        cloud_publish_status = cloud_publish_status or "skipped"
         with self.db.connect() as conn:
             conn.execute(
                 "UPDATE sync_runs SET finished_at=?, status=?, term=?, course_count=?, change_count=?, "
