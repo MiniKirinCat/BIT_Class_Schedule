@@ -8,6 +8,7 @@ from .models import CalendarEntry, FetchedSchedule
 from .security import redact
 
 TZ = ZoneInfo("Asia/Shanghai")
+CALENDAR_TIMEOUT_SECONDS = 10
 logger = logging.getLogger("next_class.school")
 
 
@@ -37,11 +38,11 @@ def _calendar_url() -> str:
     return f"{base}/jwapp/sys/kxjas/modules/kxjas/rqzhzcjc.do"
 
 
-def calendar_entry_from_payload(payload: dict, day: date) -> CalendarEntry | None:
+def calendar_entry_from_payload(payload: object, day: date) -> CalendarEntry | None:
     datas = payload.get("datas") if isinstance(payload, dict) else None
     block = datas.get("rqzhzcjc") if isinstance(datas, dict) else None
     if isinstance(block, dict):
-        rows = block.get("rows", [])
+        rows = block.get("rows") if "rows" in block else [block]
     elif isinstance(block, list):
         rows = block
     else:
@@ -54,11 +55,13 @@ def calendar_entry_from_payload(payload: dict, day: date) -> CalendarEntry | Non
     row = rows[0]
     if not isinstance(row, dict):
         return None
-    match = re.search(r"\d+", str(row.get("ZC", "")))
+    match = re.search(r"-?\d+", str(row.get("ZC", "")))
     if not match:
         return None
     week = int(match.group())
-    raw_weekday = row.get("XQJ", row.get("XQ"))
+    if week < 1:
+        return None
+    raw_weekday = row.get("XQJ") or row.get("XQ")
     try:
         weekday = int(raw_weekday) if raw_weekday is not None else day.isoweekday()
     except (TypeError, ValueError):
@@ -73,27 +76,35 @@ def _default_fetch_calendar(
 ) -> list[CalendarEntry]:
     try:
         xn, xq = term.rsplit("-", 1)
+        from bit_login.config import CONFIG
         url = _calendar_url()
-    except (ValueError, KeyError):
+        headers = CONFIG["headers"]["base"]
+    except (ValueError, KeyError, ImportError):
         return []
 
     entries: list[CalendarEntry] = []
+    failures = 0
     for day in dates:
         try:
             response = session.post(
                 url,
                 data={"RQ": day.isoformat(), "XN": xn, "XQ": xq},
+                headers=headers,
+                timeout=CALENDAR_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
             entry = calendar_entry_from_payload(response.json(), day)
             if entry is not None:
                 entries.append(entry)
         except Exception as exc:
+            failures += 1
             logger.info(
                 "日历切片 %s 获取失败：%s",
                 day.isoformat(),
                 redact(str(exc))[:120],
             )
+    if failures:
+        logger.warning("日历切片有 %d 天获取失败", failures)
     return entries
 
 
