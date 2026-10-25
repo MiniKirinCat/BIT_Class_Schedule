@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from app.normalizer import NormalizationError, normalize, parse_weeks
@@ -43,3 +45,17 @@ def test_normalize_rejects_invalid_weekday():
 def test_missing_course_code_uses_stable_fallback():
     sessions = normalize([{**ROW, "KCH": ""}])
     assert sessions[0].course_code == "高等数学|李老师"
+
+
+@pytest.mark.parametrize("bitmap", [" 111000", "11100x", "101 100"])
+def test_parse_weeks_rejects_malformed_bitmaps(bitmap):
+    with pytest.raises(NormalizationError):
+        parse_weeks(bitmap)
+
+
+def test_normalize_skips_empty_weeks_with_warning(caplog):
+    row = {**ROW, "SKZC": "000000", "KCM": "空周课程"}
+    with caplog.at_level(logging.WARNING, logger="next_class.normalizer"):
+        assert normalize([row]) == []
+    assert "空周课程" in caplog.text
+    assert "已跳过" in caplog.text

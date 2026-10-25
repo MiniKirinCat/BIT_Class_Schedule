@@ -12,6 +12,8 @@ class NormalizationError(Exception):
 def parse_weeks(bitmap: str) -> tuple[int, ...]:
     if not isinstance(bitmap, str) or not bitmap:
         raise NormalizationError("SKZC 周次位图缺失或类型错误")
+    if set(bitmap) - {"0", "1"}:
+        raise NormalizationError("SKZC 周次位图格式错误")
     return tuple(index + 1 for index, flag in enumerate(bitmap) if flag == "1")
 
 
@@ -27,7 +29,7 @@ def normalize(rows: list[dict]) -> list[CourseSession]:
     result: list[CourseSession] = []
     seen: set[tuple] = set()
     warned_missing_code = False
-    for row in rows:
+    for row_index, row in enumerate(rows, start=1):
         try:
             weekday = int(row["SKXQ"])
             start = int(row["KSJC"])
@@ -40,6 +42,8 @@ def normalize(rows: list[dict]) -> list[CourseSession]:
         if not (1 <= start <= end <= 13):
             raise NormalizationError(f"节次超出 1-13: {start}-{end}")
         if not weeks:
+            course_hint = row.get("KCM") or row.get("KCH") or "未知课程"
+            logger.warning("第 %d 行课程「%s」SKZC 无有效周次，已跳过", row_index, course_hint)
             continue
 
         course_name = _as_text(row.get("KCM"), "KCM")

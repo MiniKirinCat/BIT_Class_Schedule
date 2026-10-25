@@ -1,6 +1,7 @@
-from app.models import CourseSession
+from app.models import CalendarEntry, CourseSession
 from app.schedule import (
     PERIOD_TIMES,
+    calendar_entry_for,
     format_periods,
     format_session_label,
     format_weekday,
@@ -25,3 +26,17 @@ def test_session_label():
     assert format_periods(1, 2) == "1-2 节"
     assert weeks_label((1, 2, 3, 5)) == "第1-3,5周"
     assert format_session_label(s) == "周一 1-2 节"
+
+
+def test_calendar_entry_lookup():
+    entries = [
+        CalendarEntry(date="2026-10-26", week=9, weekday=1),
+        CalendarEntry(date="2026-10-27", week=9, weekday=2),
+    ]
+    assert calendar_entry_for(entries, "2026-10-27") == entries[1]
+    assert calendar_entry_for(entries, "2026-10-28") is None
+
+
+def test_singular_period_and_unsorted_weeks_label():
+    assert format_periods(3, 3) == "3 节"
+    assert weeks_label((3, 1, 2)) == "第1-3周"
