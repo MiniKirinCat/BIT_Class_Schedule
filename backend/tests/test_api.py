@@ -1,0 +1,518 @@
+from datetime import date
+
+from fastapi.testclient import TestClient
+
+from app.api import create_app
+from app.config import AppConfig
+from app.container import build_container
+from app.models import CalendarEntry, FetchedSchedule
+from app.school_gateway import SchoolError
+from app.security import CredentialError
+
+ROW = {
+    "KCH": "MATH101",
+    "KCM": "高等数学",
+    "SKJS": "李老师",
+    "JASMC": "A101",
+    "YPSJDD": "周一第1-2节{第1-4周}",
+    "SKZC": "111100",
+    "SKXQ": 1,
+    "KSJC": 1,
+    "JSJC": 2,
+    "XXXQMC": "良乡",
+}
+
+
+class FakeGateway:
+    def __init__(self):
+        self.raw = FetchedSchedule(
+            term="2025-2026-1",
+            first_day=date(2025, 9, 1),
+            rows=[ROW],
+            calendar=[CalendarEntry(date="2026-10-26", week=9, weekday=1)],
+        )
+        self.error = None
+        self.calls = []
+
+    def fetch(self, username, password):
+        self.calls.append((username, password))
+        if self.error:
+            raise self.error
+        return self.raw
+
+
+class FakeCredentials:
+    def __init__(self):
+        self.values = {}
+
+    def get(self, key):
+        return self.values.get(key)
+
+    def set(self, key, value):
+        self.values[key] = value
+
+    def delete(self, key):
+        self.values.pop(key, None)
+
+    def has(self, key):
+        return key in self.values
+
+
+class BrokenCredentials(FakeCredentials):
+    """Simulates an unavailable keyring backend."""
+
+    def get(self, key):
+        raise CredentialError("Windows 凭据管理器不可用，无法读取敏感配置")
+
+    def set(self, key, value):
+        raise CredentialError("Windows 凭据管理器不可用，敏感配置未保存")
+
+    def has(self, key):
+        raise CredentialError("Windows 凭据管理器不可用，无法读取敏感配置")
+
+
+class FakeNotifier:
+    def __init__(self):
+        self.messages = []
+        self.configured = False
+        self.fail = False
+        self.error = "push down"
+        self.close_calls = 0
+
+    def is_configured(self):
+        return self.configured
+
+    def send(self, title, content):
+        if self.fail:
+            raise RuntimeError(self.error)
+        self.messages.append((title, content))
+
+    def close(self):
+        self.close_calls += 1
+
+
+def make_app(
+    tmp_path,
+    gateway,
+    *,
+    frontend_dir=None,
+    credentials=None,
+    notifier=None,
+):
+    config = AppConfig(
+        data_dir=tmp_path,
+        frontend_dir=frontend_dir if frontend_dir is not None else tmp_path / "dist",
+        scheduler_enabled=False,
+    )
+    credentials = credentials if credentials is not None else FakeCredentials()
+    notifier = notifier if notifier is not None else FakeNotifier()
+    container = build_container(
+        config,
+        credentials=credentials,
+        gateway=gateway,
+        notifier=notifier,
+    )
+    return create_app(config, container), credentials, notifier
+
+
+def test_status_and_dashboard_before_setup(tmp_path):
+    app, _, _ = make_app(tmp_path, FakeGateway())
+    with TestClient(app) as client:
+        status = client.get("/api/status")
+        assert status.status_code == 200
+        body = status.json()
+        assert body["configured"] is False
+        assert body["school_configured"] is False
+        assert body["school_username"] is None
+        assert body["push_configured"] is False
+        assert body["cloud_configured"] is False
+        assert body["last_sync_at"] is None
+        assert body["last_attempt_at"] is None
+        assert body["next_due_at"]
+        assert body["sync_status"] is None
+        assert body["last_error"] is None
+        assert body["notification_error"] is None
+        assert body["cloud_status"] == "skipped"
+        assert body["version"] == AppConfig().app_version
+
+        assert client.get("/api/dashboard").status_code == 404
+        assert client.post("/api/sync").status_code == 400
+
+
+def test_setup_school_syncs_and_then_enforces_cooldown(tmp_path):
+    gateway = FakeGateway()
+    app, credentials, _ = make_app(tmp_path, gateway)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/setup/school",
+            json={"username": " 20250001 ", "password": "pw"},
+        )
+        assert response.status_code == 200
+        assert response.json()["configured"] is True
+        assert response.json()["status"] == "success"
+        assert credentials.get("school_username") == "20250001"
+        assert credentials.get("school_password") == "pw"
+        assert gateway.calls == [("20250001", "pw")]
+
+        dashboard = client.get("/api/dashboard")
+        assert dashboard.status_code == 200
+        body = dashboard.json()
+        assert body["courses"][0]["course_name"] == "高等数学"
+        assert len(body["period_times"]) == 13
+        assert body["term"] == "2025-2026-1"
+
+        status = client.get("/api/status").json()
+        assert status["configured"] is True
+        assert status["school_configured"] is True
+        assert status["school_username"] == "20250001"
+        assert status["push_configured"] is False
+        assert status["cloud_configured"] is False
+        assert status["last_sync_at"] is not None
+        assert status["last_attempt_at"] is not None
+        assert status["sync_status"] == "success"
+        assert status["cloud_status"] == "skipped"
+        assert status["next_due_at"] is not None
+
+        cooldown = client.post("/api/sync")
+        assert cooldown.status_code == 429
+        assert "分钟" in cooldown.json()["detail"]
+
+
+def test_setup_school_failure_does_not_save_credentials(tmp_path):
+    gateway = FakeGateway()
+    gateway.error = SchoolError("LOGIN_FAILED", "登录失败")
+    app, credentials, _ = make_app(tmp_path, gateway)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": "bad"},
+        )
+        assert response.status_code == 502
+        assert response.json()["detail"] == "登录失败"
+        assert credentials.get("school_username") is None
+        assert credentials.get("school_password") is None
+
+        status = client.get("/api/status").json()
+        assert status["configured"] is False
+        assert status["sync_status"] == "failed"
+        assert status["last_error"] == "登录失败"
+
+        # A failed setup must not publish a dashboard snapshot.
+        assert client.get("/api/dashboard").status_code == 404
+
+
+def test_settings_validation_and_update(tmp_path):
+    app, _, _ = make_app(tmp_path, FakeGateway())
+    with TestClient(app) as client:
+        current = client.get("/api/settings")
+        assert current.status_code == 200
+        assert current.json() == {
+            "sync_interval_days": 1,
+            "push_enabled": False,
+            "school_configured": False,
+            "push_configured": False,
+            "cloud_configured": False,
+        }
+
+        updated = client.put(
+            "/api/settings",
+            json={"sync_interval_days": 3, "push_enabled": True},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["sync_interval_days"] == 3
+        assert updated.json()["push_enabled"] is True
+
+        for invalid in (0, 4):
+            rejected = client.put(
+                "/api/settings",
+                json={"sync_interval_days": invalid},
+            )
+            assert rejected.status_code == 422
+            assert rejected.json() == {"detail": "请求参数不正确"}
+
+        # Rejected updates must not stick.
+        assert client.get("/api/settings").json()["sync_interval_days"] == 3
+
+
+def test_pushplus_setup_and_test_notification(tmp_path):
+    app, credentials, notifier = make_app(tmp_path, FakeGateway())
+    notifier.configured = True
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/setup/pushplus",
+            json={"token": "  push-token  ", "test": True},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"configured": True, "tested": True}
+        assert credentials.get("pushplus_token") == "push-token"
+        assert app.state.container.settings.get_bool("push_enabled", False) is True
+        assert notifier.messages[0][0] == "下一节测试提醒"
+
+        status = client.get("/api/status").json()
+        assert status["push_configured"] is True
+
+        tested = client.post("/api/notifications/test")
+        assert tested.status_code == 200
+        assert tested.json() == {"status": "sent"}
+        assert len(notifier.messages) == 2
+
+        blank = client.post("/api/setup/pushplus", json={"token": "   "})
+        assert blank.status_code == 422
+
+
+def test_pushplus_setup_failure_keeps_token_and_redacts_error(tmp_path):
+    app, credentials, notifier = make_app(tmp_path, FakeGateway())
+    notifier.configured = True
+    notifier.fail = True
+    notifier.error = "send failed token=push-secret-token-123"
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/setup/pushplus",
+            json={"token": "push-token", "test": True},
+        )
+        assert response.status_code == 502
+        detail = response.json()["detail"]
+        assert "push-secret-token-123" not in detail
+        assert "token=[REDACTED]" in detail
+
+        # The token is saved before the optional test send, so a later retry
+        # only needs to fix the network/PushPlus side.
+        assert credentials.get("pushplus_token") == "push-token"
+        assert app.state.container.settings.get_bool("push_enabled", False) is True
+
+
+def test_test_notification_requires_configuration(tmp_path):
+    app, _, _ = make_app(tmp_path, FakeGateway())
+    with TestClient(app) as client:
+        assert client.post("/api/notifications/test").status_code == 400
+
+
+def test_school_setup_rejects_blank_username_and_overlong_password(tmp_path):
+    app, credentials, _ = make_app(tmp_path, FakeGateway())
+    with TestClient(app) as client:
+        blank = client.post(
+            "/api/setup/school",
+            json={"username": "   ", "password": "pw"},
+        )
+        assert blank.status_code == 422
+        assert blank.json() == {"detail": "学号不能为空"}
+
+        overlong = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": "x" * 257},
+        )
+        assert overlong.status_code == 422
+        assert overlong.json() == {"detail": "请求参数不正确"}
+        assert credentials.get("school_username") is None
+
+
+def test_school_setup_credential_failure_returns_503(tmp_path):
+    password = "secret-password-123"
+    app, _, _ = make_app(
+        tmp_path,
+        FakeGateway(),
+        credentials=BrokenCredentials(),
+    )
+    with TestClient(app) as client:
+        status = client.get("/api/status")
+        assert status.status_code == 200
+        assert status.json()["configured"] is False
+        assert status.json()["push_configured"] is False
+
+        response = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": password},
+        )
+        assert response.status_code == 503
+        assert "凭据管理器" in response.json()["detail"]
+        assert password not in response.json()["detail"]
+
+
+def test_dashboard_payload_contains_expected_fields(tmp_path):
+    gateway = FakeGateway()
+    app, _, _ = make_app(tmp_path, gateway)
+
+    with TestClient(app) as client:
+        setup = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": "pw"},
+        )
+        assert setup.status_code == 200
+
+        body = client.get("/api/dashboard").json()
+        assert body["schema_version"] == 1
+        assert body["app_version"] == AppConfig().app_version
+        assert body["synced_at"]
+        assert body["sync_interval_days"] == 1
+        assert body["term"] == "2025-2026-1"
+        assert body["first_day"] == "2025-09-01"
+        assert len(body["period_times"]) == 13
+        assert body["period_times"][0] == {
+            "index": 1,
+            "start": "08:00",
+            "end": "08:45",
+        }
+        assert [course["course_name"] for course in body["courses"]] == ["高等数学"]
+        assert body["courses"][0]["weeks"] == [1, 2, 3, 4]
+        assert body["calendar"] == [
+            {"date": "2026-10-26", "week": 9, "weekday": 1}
+        ]
+        assert body["changes"] == []
+        assert body["sync_status"] == "success"
+        assert body["last_attempt_at"]
+        assert body["next_due_at"]
+        assert body["cloud_status"] == "skipped"
+        assert body["last_error"] == ""
+        assert body["configured"] is True
+
+        # A second sync with a different room records one change entry.
+        gateway.raw = FetchedSchedule(
+            term=gateway.raw.term,
+            first_day=gateway.raw.first_day,
+            rows=[{**ROW, "JASMC": "A202"}],
+            calendar=gateway.raw.calendar,
+        )
+        app.state.container.settings.set(
+            "last_attempt_sync_at", "2020-01-01T00:00:00+08:00"
+        )
+        synced = client.post("/api/sync")
+        assert synced.status_code == 200
+        assert synced.json()["change_count"] == 1
+
+        body = client.get("/api/dashboard").json()
+        assert len(body["changes"]) == 1
+        change = body["changes"][0]
+        assert set(change) == {
+            "id",
+            "detected_at",
+            "type",
+            "course_code",
+            "course_name",
+            "summary",
+            "before",
+            "after",
+        }
+        assert change["type"] == "modified"
+        assert change["course_code"] == "MATH101"
+        assert change["course_name"] == "高等数学"
+        assert change["before"]["room"] == "A101"
+        assert change["after"]["room"] == "A202"
+
+
+def test_manual_sync_runs_after_cooldown_expires(tmp_path):
+    gateway = FakeGateway()
+    app, _, _ = make_app(tmp_path, gateway)
+
+    with TestClient(app) as client:
+        setup = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": "pw"},
+        )
+        assert setup.status_code == 200
+        assert client.post("/api/sync").status_code == 429
+
+        app.state.container.settings.set(
+            "last_attempt_sync_at", "2020-01-01T00:00:00+08:00"
+        )
+        calls_before = len(gateway.calls)
+        response = client.post("/api/sync")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "success"
+        assert body["course_count"] == 1
+        assert body["change_count"] == 0
+        assert body["cloud_status"] == "skipped"
+        assert body["error_code"] is None
+        assert len(gateway.calls) == calls_before + 1
+
+
+def test_static_frontend_mounted_without_shadowing_api(tmp_path):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text(
+        "<html><body>next-class index</body></html>", encoding="utf-8"
+    )
+    app, _, _ = make_app(tmp_path, FakeGateway(), frontend_dir=dist)
+
+    with TestClient(app) as client:
+        root = client.get("/")
+        assert root.status_code == 200
+        assert "next-class index" in root.text
+
+        assert client.get("/api/health").json() == {"status": "ok"}
+
+        missing = client.get("/api/missing")
+        assert missing.status_code == 404
+        assert missing.headers["content-type"].startswith("application/json")
+        assert missing.json() == {"detail": "接口不存在"}
+        assert "next-class index" not in missing.text
+
+
+def test_lifespan_initializes_db_and_closes_owned_notifier(tmp_path):
+    config = AppConfig(
+        data_dir=tmp_path,
+        frontend_dir=tmp_path / "dist",
+        scheduler_enabled=False,
+    )
+    container = build_container(
+        config,
+        credentials=FakeCredentials(),
+        gateway=FakeGateway(),
+    )
+    assert container.owns_notifier is True
+    http_client = container.notifier._client
+    app = create_app(config, container)
+
+    with TestClient(app) as client:
+        assert client.get("/api/health").status_code == 200
+        assert container.db.path.exists()
+        assert container.settings.get("app_schema_version") == "1"
+        assert container.settings.get("sync_interval_days") == "1"
+        assert not http_client.is_closed
+
+    assert http_client.is_closed
+
+
+def test_lifespan_leaves_injected_notifier_open(tmp_path):
+    config = AppConfig(
+        data_dir=tmp_path,
+        frontend_dir=tmp_path / "dist",
+        scheduler_enabled=False,
+    )
+    notifier = FakeNotifier()
+    container = build_container(
+        config,
+        credentials=FakeCredentials(),
+        gateway=FakeGateway(),
+        notifier=notifier,
+    )
+    app = create_app(config, container)
+
+    with TestClient(app) as client:
+        assert client.get("/api/health").status_code == 200
+        assert container.settings.get("app_schema_version") == "1"
+
+    assert notifier.close_calls == 0
+
+
+def test_lifespan_builds_container_when_none_injected(tmp_path):
+    config = AppConfig(
+        data_dir=tmp_path,
+        frontend_dir=tmp_path / "dist",
+        scheduler_enabled=False,
+    )
+    app = create_app(config)
+
+    with TestClient(app) as client:
+        assert client.get("/api/health").status_code == 200
+        active = app.state.container
+        assert active is not None
+        assert active.config is config
+        assert active.db.path.exists()
+        assert not active.notifier._client.is_closed
+
+    assert active.notifier._client.is_closed

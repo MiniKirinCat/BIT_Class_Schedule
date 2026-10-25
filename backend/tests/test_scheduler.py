@@ -125,6 +125,31 @@ def test_start_runs_first_tick_without_waiting_for_interval():
     assert scheduler._task is None
 
 
+def test_tick_accepts_custom_trigger():
+    service = FakeService()
+    scheduler = make_scheduler(service)
+
+    assert asyncio.run(scheduler.tick(NOW, trigger="startup")) is True
+    assert service.calls == [("startup", NOW)]
+
+
+def test_start_uses_initial_trigger_only_for_first_tick():
+    service = FakeService()
+    scheduler = make_scheduler(service, seconds=0.01)
+
+    async def scenario():
+        scheduler.start(initial_trigger="startup")
+        await asyncio.sleep(0.08)
+        await scheduler.stop()
+
+    asyncio.run(scenario())
+    triggers = [trigger for trigger, _ in service.calls]
+    assert triggers[0] == "startup"
+    assert len(triggers) >= 2
+    assert all(trigger == "scheduled" for trigger in triggers[1:])
+    assert scheduler._task is None
+
+
 def test_restart_after_stop_ticks_again():
     service = FakeService()
     scheduler = make_scheduler(service, seconds=3600)

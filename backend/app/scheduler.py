@@ -21,25 +21,31 @@ class SyncScheduler:
         self._stop = asyncio.Event()
         self._task: asyncio.Task | None = None
 
-    async def tick(self, now: datetime | None = None) -> bool:
+    async def tick(
+        self,
+        now: datetime | None = None,
+        trigger: str = "scheduled",
+    ) -> bool:
         if not self._service.is_configured():
             return False
         if not self._service.is_due(now):
             return False
         try:
-            await self._service.sync("scheduled", now=now)
+            await self._service.sync(trigger, now=now)
         except SyncBusyError:
             return False
         return True
 
-    async def run(self) -> None:
+    async def run(self, initial_trigger: str = "scheduled") -> None:
+        trigger = initial_trigger
         while not self._stop.is_set():
             try:
-                await self.tick()
+                await self.tick(trigger=trigger)
             except Exception as exc:
                 # Tracebacks can render raw exception text (possible secrets),
                 # so log only a sanitized message.
                 self._logger.error("scheduler tick failed: %s", safe_message(exc))
+            trigger = "scheduled"
             try:
                 await asyncio.wait_for(
                     self._stop.wait(),
@@ -48,10 +54,10 @@ class SyncScheduler:
             except TimeoutError:
                 pass
 
-    def start(self) -> None:
+    def start(self, initial_trigger: str = "scheduled") -> None:
         if self._task is None or self._task.done():
             self._stop.clear()
-            self._task = asyncio.create_task(self.run())
+            self._task = asyncio.create_task(self.run(initial_trigger))
 
     async def stop(self) -> None:
         self._stop.set()
