@@ -1,17 +1,13 @@
 import logging
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Callable
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from .models import CalendarEntry, FetchedSchedule
 from .security import redact
 
-try:
-    TZ = ZoneInfo("Asia/Shanghai")
-except ZoneInfoNotFoundError:
-    # Windows 的 Python 未内置 IANA 时区库；中国无夏令时，固定 +08:00 等价。
-    TZ = timezone(timedelta(hours=8), "Asia/Shanghai")
+TZ = ZoneInfo("Asia/Shanghai")
 logger = logging.getLogger("next_class.school")
 
 

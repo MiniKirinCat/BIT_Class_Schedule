@@ -4,6 +4,7 @@ pydantic==2.10.4
 httpx==0.28.1
 keyring==25.6.0
 cryptography==44.0.1
+tzdata==2026.5
 pytest==8.3.4
 pytest-asyncio==0.25.0
 bit_login @ git+https://github.com/BIT101-dev/BIT-Login-Python.git@5d537ca6123b405666b82eabc2328b8f4c70b6ca
