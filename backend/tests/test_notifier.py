@@ -165,3 +165,25 @@ def test_server_message_is_redacted():
     with pytest.raises(NotificationError) as exc:
         make_notifier(handler, token=secret).send("标题", "正文")
     assert secret not in str(exc.value)
+
+
+def test_server_bare_token_echo_is_redacted():
+    secret = "super-secret-token"
+
+    def handler(request):
+        return httpx.Response(200, json={"code": 903, "msg": f"bad {secret}"})
+
+    with pytest.raises(NotificationError) as exc:
+        make_notifier(handler, token=secret).send("标题", "正文")
+    assert secret not in str(exc.value)
+
+
+def test_server_token_in_code_is_redacted():
+    secret = "super-secret-token"
+
+    def handler(request):
+        return httpx.Response(200, json={"code": f"bad {secret}", "msg": "x"})
+
+    with pytest.raises(NotificationError) as exc:
+        make_notifier(handler, token=secret).send("标题", "正文")
+    assert secret not in str(exc.value)

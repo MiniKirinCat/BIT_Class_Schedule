@@ -35,6 +35,11 @@ class PushPlusNotifier:
         if not token:
             raise NotificationError("PushPlus 未配置")
 
+        token_text = str(token)
+
+        def safe(value: object, limit: int) -> str:
+            return redact(str(value)).replace(token_text, "[REDACTED]")[:limit]
+
         last_error = "PushPlus 发送失败"
         payload = {"token": token, "title": title, "content": content, "template": "txt"}
         for _ in range(2):
@@ -48,10 +53,10 @@ class PushPlusNotifier:
                 message = body.get("msg") if isinstance(body, dict) else ""
                 detail = f"PushPlus 返回异常（HTTP {response.status_code}"
                 if code is not None:
-                    detail += f"，code {code}"
+                    detail += f"，code {safe(code, 40)}"
                 if message:
-                    detail += f"：{redact(str(message))[:80]}"
+                    detail += f"：{safe(message, 80)}"
                 last_error = detail + "）"
             except (httpx.HTTPError, ValueError, AttributeError) as exc:
-                last_error = redact(str(exc))[:200] or last_error
+                last_error = safe(exc, 200) or last_error
         raise NotificationError(last_error)
