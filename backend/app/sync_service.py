@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import math
+import threading
 from datetime import datetime, timedelta
 from typing import Callable, Protocol
 from zoneinfo import ZoneInfo
@@ -108,6 +109,7 @@ class SyncService:
         self._now = now or (lambda: datetime.now(TZ))
         self._logger = logger or logging.getLogger("next_class.sync")
         self._lock = asyncio.Lock()
+        self._worker_lock = threading.Lock()
 
     @property
     def lock(self) -> asyncio.Lock:
@@ -174,66 +176,73 @@ class SyncService:
         username: str | None,
         password: str | None,
     ) -> SyncResult:
-        started = _iso(moment)
-        self._settings.set("last_attempt_sync_at", started)
-        run_id = self._snapshots.record_sync_run(
-            trigger=trigger,
-            started_at=started,
-            finished_at=None,
-            status="running",
-        )
-
+        if not self._worker_lock.acquire(blocking=False):
+            raise SyncBusyError("同步正在进行中")
         try:
-            username = username or self._credentials.get("school_username")
-            password = password or self._credentials.get("school_password")
-        except CredentialError as exc:
-            return self._fail(run_id, "KEYRING_ERROR", str(exc), moment)
-        if not username or not password:
-            return self._fail(run_id, "NOT_CONFIGURED", "尚未配置教务账号", moment)
-
-        try:
-            fetched = self._gateway.fetch(username, password)
-            sessions = normalize(fetched.rows)
-        except SchoolError as exc:
-            return self._fail(run_id, exc.code, exc.user_message, moment)
-        except NormalizationError:
-            return self._fail(
-                run_id, "PARSE_ERROR", "课表解析失败，已保留上次快照", moment
-            )
-        except Exception as exc:
-            self._logger.error("sync failed: %s", safe_message(exc))
-            return self._fail(
-                run_id, "UNEXPECTED_ERROR", "同步时发生未知错误，请稍后重试", moment
+            started = _iso(moment)
+            self._settings.set("last_attempt_sync_at", started)
+            run_id = self._snapshots.record_sync_run(
+                trigger=trigger,
+                started_at=started,
+                finished_at=None,
+                status="running",
             )
 
-        previous = self._snapshots.latest()
-        if (
-            previous is not None
-            and previous.term == fetched.term
-            and not sessions
-            and previous.sessions
-        ):
-            return self._handle_empty(run_id, fetched, moment)
+            try:
+                try:
+                    username = username or self._credentials.get("school_username")
+                    password = password or self._credentials.get("school_password")
+                except CredentialError as exc:
+                    return self._fail(run_id, "KEYRING_ERROR", str(exc), moment)
+                if not username or not password:
+                    return self._fail(
+                        run_id, "NOT_CONFIGURED", "尚未配置教务账号", moment
+                    )
 
-        changes = detect_changes(
-            previous.sessions if previous else None,
-            sessions,
-            previous.term if previous else None,
-            fetched.term,
-            previous.first_day if previous else None,
-            fetched.first_day.isoformat(),
-            _iso(moment),
-        )
-        is_baseline = previous is None or previous.term != fetched.term
-        return self._complete_success(
-            run_id=run_id,
-            fetched=fetched,
-            sessions=sessions,
-            changes=changes,
-            is_baseline=is_baseline,
-            moment=moment,
-            announce=previous is not None,
-        )
+                try:
+                    fetched = self._gateway.fetch(username, password)
+                    sessions = normalize(fetched.rows)
+                except SchoolError as exc:
+                    return self._fail(run_id, exc.code, exc.user_message, moment)
+                except NormalizationError:
+                    return self._fail(
+                        run_id, "PARSE_ERROR", "课表解析失败，已保留上次快照", moment
+                    )
+
+                previous = self._snapshots.latest()
+                if (
+                    previous is not None
+                    and previous.term == fetched.term
+                    and not sessions
+                    and previous.sessions
+                ):
+                    return self._handle_empty(run_id, fetched, moment)
+
+                changes = detect_changes(
+                    previous.sessions if previous else None,
+                    sessions,
+                    previous.term if previous else None,
+                    fetched.term,
+                    previous.first_day if previous else None,
+                    fetched.first_day.isoformat(),
+                    _iso(moment),
+                )
+                is_baseline = previous is None or previous.term != fetched.term
+                return self._complete_success(
+                    run_id=run_id,
+                    fetched=fetched,
+                    sessions=sessions,
+                    changes=changes,
+                    is_baseline=is_baseline,
+                    moment=moment,
+                )
+            except Exception as exc:
+                self._logger.error("sync failed: %s", safe_message(exc))
+                return self._fail(
+                    run_id, "UNEXPECTED_ERROR", "同步时发生未知错误，请稍后重试", moment
+                )
+        finally:
+            self._worker_lock.release()
 
     def _handle_empty(
         self,
@@ -282,7 +291,6 @@ class SyncService:
             changes=[empty_confirmed_event()],
             is_baseline=True,
             moment=moment,
-            announce=True,
             message="课表连续两次为空，已按空课表更新",
         )
 
@@ -295,7 +303,6 @@ class SyncService:
         changes: list[ChangeEvent],
         is_baseline: bool,
         moment: datetime,
-        announce: bool,
         message: str = "",
     ) -> SyncResult:
         finished = _iso(moment)
@@ -325,8 +332,7 @@ class SyncService:
         self._settings.set_int("failure_streak", 0)
         self._settings.set_int("empty_streak", 0)
 
-        if announce:
-            self._notify_changes(changes, sessions, fetched.term, snapshot_id, finished)
+        self._notify_changes(changes, sessions, fetched.term, snapshot_id, finished)
         cloud_status = self._publish(fetched, sessions, finished)
 
         self._snapshots.finish_sync_run(
@@ -375,6 +381,8 @@ class SyncService:
         if self._send_notification(title, content):
             self._settings.set("last_notified_change_set_hash", digest)
             self._snapshots.mark_changes_notified(snapshot_id, detected_at)
+        else:
+            self._settings.set("last_notified_change_set_hash", "")
 
     def _send_notification(self, title: str, content: str) -> bool:
         if not self._settings.get_bool("push_enabled", False):

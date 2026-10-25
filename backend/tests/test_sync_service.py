@@ -1,14 +1,14 @@
 import asyncio
 import logging
+import threading
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 
-import app.sync_service as sync_service_module
 from app.config import AppConfig
 from app.db import Database, SettingsRepo, SnapshotRepo
-from app.models import CalendarEntry, ChangeEvent, FetchedSchedule
+from app.models import CalendarEntry, FetchedSchedule
 from app.notifier import NotificationError
 from app.school_gateway import SchoolError
 from app.sync_service import SyncBusyError, SyncService
@@ -47,10 +47,25 @@ class FakeGateway:
     def __init__(self, raw=None, error=None):
         self.raw = raw
         self.error = error
+        self.calls = []
 
     def fetch(self, username, password):
+        self.calls.append((username, password))
         if self.error:
             raise self.error
+        return self.raw
+
+
+class BlockingGateway:
+    def __init__(self, raw, started, release):
+        self.raw = raw
+        self.started = started
+        self.release = release
+
+    def fetch(self, username, password):
+        self.started.set()
+        if not self.release.wait(5):
+            raise RuntimeError("test timeout")
         return self.raw
 
 
@@ -216,6 +231,28 @@ def test_term_rollover_is_one_baseline_notice(tmp_path):
     assert "共 1 门课程" in content
 
 
+def test_term_rollover_to_empty_schedule_is_baseline_not_anomaly(tmp_path):
+    gateway = FakeGateway(fetched([ROW]))
+    service, settings, snapshots, notifier = make_service(tmp_path, gateway)
+    run(service)
+
+    gateway.raw = fetched([], term="2026-2027-1", first_day=date(2026, 9, 7))
+    result = run(service)
+
+    assert result.status == "success"
+    assert result.change_count == 1
+    assert result.error_code is None
+    latest = snapshots.latest()
+    assert latest.term == "2026-2027-1"
+    assert latest.sessions == []
+    assert latest.is_baseline is True
+    titles = [message[0] for message in notifier.messages]
+    assert titles == ["新学期课表已同步"]
+    assert "共 0 门课程" in notifier.messages[-1][1]
+    assert "课表同步失败" not in titles
+    assert settings.get("last_error_code") == ""
+
+
 def test_failure_preserves_snapshot_and_notifies_only_first_of_streak(tmp_path):
     gateway = FakeGateway(fetched([ROW]))
     service, settings, snapshots, notifier = make_service(tmp_path, gateway)
@@ -273,6 +310,32 @@ def test_notification_failure_does_not_fail_sync(tmp_path):
     assert snapshots.changes_for_term("2025-2026-1")[0]["notified_at"] is None
 
 
+def test_failed_notification_clears_stale_hash_so_repeated_change_notifies(tmp_path):
+    gateway = FakeGateway(fetched([ROW]))
+    service, settings, _, notifier = make_service(tmp_path, gateway)
+
+    run(service)  # baseline A
+    gateway.raw = fetched([{**ROW, "JASMC": "B202"}])
+    run(service)  # B, notified successfully
+    assert len(notifier.messages) == 1
+
+    notifier.fail = True
+    gateway.raw = fetched([ROW])
+    result = run(service)  # back to A, notification fails
+    assert result.status == "success"
+    assert len(notifier.messages) == 1
+    assert not settings.get("last_notified_change_set_hash")
+
+    notifier.fail = False
+    gateway.raw = fetched([{**ROW, "JASMC": "B202"}])
+    run(service)  # B again, must notify because B -> A was never delivered
+
+    assert len(notifier.messages) == 2
+    title, content = notifier.messages[-1]
+    assert title == "课表变动 · 1 处"
+    assert "A101" in content and "B202" in content
+
+
 def test_due_time_and_manual_cooldown(tmp_path):
     gateway = FakeGateway(fetched([ROW]))
     service, settings, _, _ = make_service(tmp_path, gateway)
@@ -289,6 +352,16 @@ def test_due_time_and_manual_cooldown(tmp_path):
     assert service.next_due_at(NOW) == NOW + timedelta(hours=1)
 
 
+def test_backoff_escalates_and_caps(tmp_path):
+    service, settings, _, _ = make_service(tmp_path, FakeGateway(fetched([ROW])))
+    run(service)
+    assert settings.get("last_attempt_sync_at") == NOW.isoformat(timespec="seconds")
+
+    for streak, hours in ((2, 3), (3, 6), (5, 24), (6, 24)):
+        settings.set_int("failure_streak", streak)
+        assert service.next_due_at(NOW) == NOW + timedelta(hours=hours)
+
+
 def test_sync_returns_busy_when_lock_is_held(tmp_path):
     gateway = FakeGateway(fetched([ROW]))
     service, _, _, _ = make_service(tmp_path, gateway)
@@ -301,27 +374,78 @@ def test_sync_returns_busy_when_lock_is_held(tmp_path):
     asyncio.run(scenario())
 
 
-def test_first_baseline_does_not_notify_even_with_changes(tmp_path, monkeypatch):
+def test_cancelled_sync_keeps_worker_busy_until_thread_finishes(tmp_path):
+    started = threading.Event()
+    release = threading.Event()
+    gateway = BlockingGateway(fetched([ROW]), started, release)
+    service, _, _, _ = make_service(tmp_path, gateway)
+
+    async def scenario():
+        task = asyncio.create_task(service.sync("manual", now=NOW))
+        assert await asyncio.to_thread(started.wait, 2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        with pytest.raises(SyncBusyError):
+            await service.sync("manual", now=NOW)
+
+        release.set()
+        for _ in range(200):
+            if not service._worker_lock.locked():
+                break
+            await asyncio.sleep(0.01)
+        assert not service._worker_lock.locked()
+
+    asyncio.run(scenario())
+
+
+def test_finalization_exception_marks_run_failed(tmp_path, monkeypatch, caplog):
     gateway = FakeGateway(fetched([ROW]))
     service, settings, snapshots, notifier = make_service(tmp_path, gateway)
-    event = ChangeEvent(
-        type="added",
-        course_code="MATH101",
-        course_name="高等数学",
-        summary="新增：周一 1-2 节 高等数学",
-        before=None,
-        after=None,
-        fingerprint="fp-first",
+
+    def boom():
+        raise RuntimeError("db boom")
+
+    monkeypatch.setattr(snapshots, "latest", boom)
+
+    with caplog.at_level(logging.ERROR, logger="next_class.sync"):
+        result = run(service)
+
+    assert result.status == "failed"
+    assert result.error_code == "UNEXPECTED_ERROR"
+    assert result.message == "同步时发生未知错误，请稍后重试"
+    assert "db boom" not in result.message
+    run_row = snapshots.latest_sync_run()
+    assert run_row["status"] == "failed"
+    assert run_row["error_code"] == "UNEXPECTED_ERROR"
+    assert run_row["error_message"] == "同步时发生未知错误，请稍后重试"
+    with snapshots.db.connect() as conn:
+        running = conn.execute(
+            "SELECT COUNT(*) AS total FROM sync_runs WHERE status='running'"
+        ).fetchone()["total"]
+    assert running == 0
+    assert "sync failed" in caplog.text
+    assert "Traceback" not in caplog.text
+    assert settings.get("last_error_code") == "UNEXPECTED_ERROR"
+    assert notifier.messages[0][0] == "课表同步失败"
+
+
+def test_not_configured_fails_without_calling_gateway(tmp_path):
+    gateway = FakeGateway(fetched([ROW]))
+    service, settings, snapshots, notifier = make_service(
+        tmp_path, gateway, credentials=FakeCredentials()
     )
-    monkeypatch.setattr(sync_service_module, "detect_changes", lambda *args, **kwargs: [event])
 
     result = run(service)
 
-    assert result.status == "success"
-    assert result.change_count == 1
-    assert snapshots.latest().is_baseline is True
-    assert notifier.messages == []
-    assert not settings.get("last_notified_change_set_hash")
+    assert result.status == "failed"
+    assert result.error_code == "NOT_CONFIGURED"
+    assert gateway.calls == []
+    assert snapshots.latest_sync_run()["status"] == "failed"
+    assert notifier.messages[0][0] == "课表同步失败"
+    assert "尚未配置教务账号" in notifier.messages[0][1]
+    assert settings.get("last_error_code") == "NOT_CONFIGURED"
 
 
 def test_term_rollover_resets_failure_streak(tmp_path):
