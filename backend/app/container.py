@@ -21,6 +21,11 @@ class Container:
     publisher: CloudPublisher | None
     sync_service: SyncService
     scheduler: SyncScheduler
+    owns_notifier: bool = False
+
+    def close(self) -> None:
+        if self.owns_notifier:
+            self.notifier.close()
 
 
 def build_container(
@@ -40,6 +45,7 @@ def build_container(
         if gateway is not None
         else BitSchoolGateway(calendar_days=config.calendar_days)
     )
+    owns_notifier = notifier is None
     notifier = (
         notifier
         if notifier is not None
@@ -66,4 +72,5 @@ def build_container(
         publisher=publisher,
         sync_service=sync_service,
         scheduler=scheduler,
+        owns_notifier=owns_notifier,
     )

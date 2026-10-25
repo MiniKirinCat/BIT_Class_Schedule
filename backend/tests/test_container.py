@@ -29,6 +29,14 @@ class FakeNotifier:
         raise AssertionError("no notifications expected")
 
 
+class RecordingNotifier(FakeNotifier):
+    def __init__(self):
+        self.close_calls = 0
+
+    def close(self):
+        self.close_calls += 1
+
+
 class FakePublisher:
     def publish(self, payload):
         raise AssertionError("no publication expected")
@@ -47,7 +55,7 @@ def test_container_wires_dependencies(tmp_path):
         assert container.sync_service._gateway is container.gateway
         assert container.scheduler._service is container.sync_service
     finally:
-        container.notifier.close()
+        container.close()
 
 
 def test_container_builds_default_dependencies(tmp_path):
@@ -66,7 +74,7 @@ def test_container_builds_default_dependencies(tmp_path):
         # The lifespan owns initialization; building must not touch the database.
         assert not container.db.path.exists()
     finally:
-        container.notifier.close()
+        container.close()
 
 
 def test_container_passes_through_injected_dependencies(tmp_path):
@@ -84,14 +92,18 @@ def test_container_passes_through_injected_dependencies(tmp_path):
         publisher=publisher,
     )
 
-    assert container.credentials is credentials
-    assert container.gateway is gateway
-    assert container.notifier is notifier
-    assert container.publisher is publisher
-    assert container.sync_service._credentials is credentials
-    assert container.sync_service._gateway is gateway
-    assert container.sync_service._notifier is notifier
-    assert container.sync_service._publisher is publisher
+    try:
+        assert container.credentials is credentials
+        assert container.gateway is gateway
+        assert container.notifier is notifier
+        assert container.publisher is publisher
+        assert container.sync_service._credentials is credentials
+        assert container.sync_service._gateway is gateway
+        assert container.sync_service._notifier is notifier
+        assert container.sync_service._publisher is publisher
+        assert container.owns_notifier is False
+    finally:
+        container.close()
 
 
 def test_container_respects_falsy_but_valid_credentials(tmp_path):
@@ -106,4 +118,32 @@ def test_container_respects_falsy_but_valid_credentials(tmp_path):
         # The default notifier reads its token from the injected credentials.
         assert container.notifier.is_configured() is True
     finally:
-        container.notifier.close()
+        container.close()
+
+
+def test_container_close_closes_owned_notifier(tmp_path):
+    config = AppConfig(data_dir=tmp_path, scheduler_enabled=False)
+    container = build_container(config)
+    assert container.owns_notifier is True
+
+    client = container.notifier._client
+    assert not client.is_closed
+
+    container.close()
+    assert client.is_closed
+
+    # Repeated close is safe.
+    container.close()
+    assert client.is_closed
+
+
+def test_container_close_leaves_injected_notifier_open(tmp_path):
+    config = AppConfig(data_dir=tmp_path, scheduler_enabled=False)
+    notifier = RecordingNotifier()
+    container = build_container(config, notifier=notifier)
+
+    assert container.owns_notifier is False
+    container.close()
+    container.close()
+    assert notifier.close_calls == 0
+

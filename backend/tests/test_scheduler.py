@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -35,6 +36,24 @@ class FakeService:
             raise SyncBusyError("busy")
         if self.sync_error is not None:
             raise self.sync_error
+        self.calls.append((trigger, now))
+        return "success"
+
+
+class BlockingService(FakeService):
+    """Blocks the first sync until released, then behaves normally."""
+
+    def __init__(self):
+        super().__init__()
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+        self.block_first = True
+
+    async def sync(self, trigger="scheduled", *, now=None):
+        if self.block_first:
+            self.block_first = False
+            self.entered.set()
+            await self.release.wait()
         self.calls.append((trigger, now))
         return "success"
 
@@ -92,6 +111,90 @@ def test_start_and_stop_loop():
     assert scheduler._task is None
 
 
+def test_start_runs_first_tick_without_waiting_for_interval():
+    service = FakeService()
+    scheduler = make_scheduler(service, seconds=3600)
+
+    async def scenario():
+        scheduler.start()
+        await asyncio.sleep(0.03)
+        assert service.calls == [("scheduled", None)]
+        await scheduler.stop()
+
+    asyncio.run(scenario())
+    assert scheduler._task is None
+
+
+def test_restart_after_stop_ticks_again():
+    service = FakeService()
+    scheduler = make_scheduler(service, seconds=3600)
+
+    async def scenario():
+        scheduler.start()
+        await asyncio.sleep(0.03)
+        await scheduler.stop()
+        assert service.calls == [("scheduled", None)]
+
+        scheduler.start()
+        await asyncio.sleep(0.03)
+        await scheduler.stop()
+
+    asyncio.run(scenario())
+    assert service.calls == [("scheduled", None), ("scheduled", None)]
+    assert scheduler._task is None
+
+
+def test_stop_waits_for_in_flight_sync():
+    service = BlockingService()
+    scheduler = make_scheduler(service, seconds=3600)
+
+    async def scenario():
+        scheduler.start()
+        await asyncio.wait_for(service.entered.wait(), timeout=1.0)
+
+        stop_task = asyncio.create_task(scheduler.stop())
+        await asyncio.sleep(0)
+        assert not stop_task.done()
+
+        service.release.set()
+        await asyncio.wait_for(stop_task, timeout=1.0)
+        assert service.calls == [("scheduled", None)]
+        assert scheduler._task is None
+
+    asyncio.run(scenario())
+
+
+def test_cancelled_stop_clears_task_and_allows_restart():
+    service = BlockingService()
+    scheduler = make_scheduler(service, seconds=3600)
+
+    async def scenario():
+        scheduler.start()
+        runner = scheduler._task
+        await asyncio.wait_for(service.entered.wait(), timeout=1.0)
+
+        stop_task = asyncio.create_task(scheduler.stop())
+        await asyncio.sleep(0)
+        assert not stop_task.done()
+
+        stop_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.wait_for(stop_task, timeout=1.0)
+
+        assert scheduler._task is None
+        assert runner.done()
+        assert runner.cancelled()
+
+        # The cancelled stop must not block a fresh start.
+        scheduler.start()
+        await asyncio.sleep(0.03)
+        await scheduler.stop()
+
+    asyncio.run(scenario())
+    assert service.calls == [("scheduled", None)]
+    assert scheduler._task is None
+
+
 def test_stop_without_start_and_repeated_stop_are_safe():
     service = FakeService()
     scheduler = make_scheduler(service, seconds=0.01)
@@ -138,11 +241,11 @@ def test_stop_suppresses_cancelled_task():
 def test_run_logs_sanitized_failure_and_keeps_looping(caplog):
     service = FakeService()
     service.due_error = RuntimeError("boom password=supersecret")
-    scheduler = make_scheduler(service, seconds=0.01)
+    scheduler = make_scheduler(service, seconds=0.005)
 
     async def scenario():
         scheduler.start()
-        await asyncio.sleep(0.03)
+        await asyncio.sleep(0.05)
         await scheduler.stop()
 
     with caplog.at_level(logging.ERROR, logger="next_class.scheduler"):

@@ -55,7 +55,11 @@ class SyncScheduler:
 
     async def stop(self) -> None:
         self._stop.set()
-        if self._task is not None:
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._task
-            self._task = None
+        task = self._task
+        if task is not None:
+            try:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+            finally:
+                if self._task is task:
+                    self._task = None
