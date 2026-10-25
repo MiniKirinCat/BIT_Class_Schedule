@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/dist-local/
+frontend/dist-cloud/
+*.tsbuildinfo
+
+# App data and secrets
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+.env
+.env.*
+secrets/
+
+# Brainstorming artifacts and local tooling
+.superpowers/
+.DS_Store
+Thumbs.db
