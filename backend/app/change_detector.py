@@ -1,4 +1,5 @@
 import hashlib
+import json
 from collections import defaultdict
 from datetime import datetime
 
@@ -6,13 +7,30 @@ from .models import ChangeEvent, CourseSession
 from .schedule import format_periods, format_session_label, format_weekday, weeks_label
 
 
-def _fingerprint(kind: str, course_code: str | None, summary: str) -> str:
-    raw = f"{kind}|{course_code or ''}|{summary}"
+def _fingerprint(
+    kind: str,
+    course_code: str | None,
+    summary: str,
+    before: dict | None = None,
+    after: dict | None = None,
+) -> str:
+    raw = json.dumps(
+        {
+            "type": kind,
+            "course_code": course_code or "",
+            "summary": summary,
+            "before": before,
+            "after": after,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _event(kind: str, course_code: str | None, course_name: str | None, summary: str, before: dict | None = None, after: dict | None = None) -> ChangeEvent:
-    return ChangeEvent(kind, course_code, course_name, summary, before, after, _fingerprint(kind, course_code, summary))
+    return ChangeEvent(kind, course_code, course_name, summary, before, after, _fingerprint(kind, course_code, summary, before, after))
 
 
 def _same_course_weeks(a: CourseSession, b: CourseSession) -> bool:
@@ -29,7 +47,16 @@ def _modified_summary(old: CourseSession, new: CourseSession) -> str:
         parts.append(f"教师 {old.teacher or '未填教师'} → {new.teacher or '未填教师'}")
     if old.weeks != new.weeks:
         parts.append(f"周次 {weeks_label(old.weeks)} → {weeks_label(new.weeks)}")
-    return f"{new.course_name}：调整 " + "；".join(parts)
+    return f"{format_session_label(new)} {new.course_name}：调整 " + "；".join(parts)
+
+
+def _session_summary(prefix: str, session: CourseSession) -> str:
+    text = f"{prefix}：{format_session_label(session)} {session.course_name}"
+    if session.room:
+        text += f" · {session.room}"
+    if session.weeks:
+        text += f"（{weeks_label(session.weeks)}）"
+    return text
 
 
 def detect_changes(
@@ -63,7 +90,7 @@ def detect_changes(
                 "term_start_changed",
                 None,
                 None,
-                "学期起始日期已更新，请留意周次",
+                f"学期起始日 {previous_first_day} → {current_first_day}，请留意周次",
                 {"first_day": previous_first_day},
                 {"first_day": current_first_day},
             )
@@ -85,7 +112,7 @@ def detect_changes(
     for session in added:
         added_by_course[session.course_code].append(session)
     old_by_course: dict[str, list[CourseSession]] = defaultdict(list)
-    for session in previous:
+    for session in removed:
         old_by_course[session.course_code].append(session)
 
     matched_added_ids: set[int] = set()
@@ -110,13 +137,13 @@ def detect_changes(
             summary = _modified_summary(old, new)
             events.append(_event("modified", old.course_code, new.course_name, summary, old.to_dict(), new.to_dict()))
         else:
-            summary = f"取消：{format_session_label(old)} {old.course_name}" + (f" · {old.room}" if old.room else "")
+            summary = _session_summary("取消", old)
             events.append(_event("removed", old.course_code, old.course_name, summary, old.to_dict(), None))
 
     for new in added:
         if id(new) in matched_added_ids:
             continue
-        summary = f"新增：{format_session_label(new)} {new.course_name}" + (f" · {new.room}" if new.room else "")
+        summary = _session_summary("新增", new)
         events.append(_event("added", new.course_code, new.course_name, summary, None, new.to_dict()))
 
     unique = {event.fingerprint: event for event in events}
@@ -131,7 +158,7 @@ def empty_confirmed_event() -> ChangeEvent:
 def change_set_hash(changes: list[ChangeEvent]) -> str:
     if not changes:
         return ""
-    raw = "\n".join(sorted(f"{c.type}|{c.course_code or ''}|{c.summary}" for c in changes))
+    raw = "\n".join(sorted(change.fingerprint for change in changes))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
