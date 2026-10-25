@@ -9,12 +9,18 @@ class NormalizationError(Exception):
     pass
 
 
+_TRAILING_EMPTY_CHARS = " \t\r\n\v\f\x00\u3000"
+
+
 def parse_weeks(bitmap: str) -> tuple[int, ...]:
     if not isinstance(bitmap, str) or not bitmap:
         raise NormalizationError("SKZC 周次位图缺失或类型错误")
-    if set(bitmap) - {"0", "1"}:
+    cleaned = bitmap.rstrip(_TRAILING_EMPTY_CHARS)
+    if not cleaned:
+        raise NormalizationError("SKZC 周次位图缺失或类型错误")
+    if set(cleaned) - {"0", "1"}:
         raise NormalizationError("SKZC 周次位图格式错误")
-    return tuple(index + 1 for index, flag in enumerate(bitmap) if flag == "1")
+    return tuple(index + 1 for index, flag in enumerate(cleaned) if flag == "1")
 
 
 def _as_text(value: object, field: str) -> str:

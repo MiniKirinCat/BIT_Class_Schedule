@@ -53,6 +53,16 @@ def test_parse_weeks_rejects_malformed_bitmaps(bitmap):
         parse_weeks(bitmap)
 
 
+def test_parse_weeks_ignores_trailing_empty_characters():
+    assert parse_weeks("111000  \x00") == (1, 2, 3)
+    assert parse_weeks("101100\u3000\t") == (1, 3, 4)
+
+
+def test_parse_weeks_rejects_only_empty_characters():
+    with pytest.raises(NormalizationError):
+        parse_weeks(" \x00\u3000")
+
+
 def test_normalize_skips_empty_weeks_with_warning(caplog):
     row = {**ROW, "SKZC": "000000", "KCM": "空周课程"}
     with caplog.at_level(logging.WARNING, logger="next_class.normalizer"):
