@@ -1,4 +1,3 @@
-// frontend/src/shared/today/TodayFocus.tsx
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {
   formatCountdown,

@@ -1,4 +1,3 @@
-// frontend/src/lib/theme.ts
 import { useEffect, useState } from 'react';
 import type { ThemeName } from '../types';
 import { STORAGE_KEYS, readStorage, writeStorage } from './storage';

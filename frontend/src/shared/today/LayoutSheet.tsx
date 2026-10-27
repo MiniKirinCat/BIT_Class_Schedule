@@ -1,4 +1,3 @@
-// frontend/src/shared/today/LayoutSheet.tsx
 import type { TodayLayout } from '../../types';
 import { Sheet } from '../Sheet';
 

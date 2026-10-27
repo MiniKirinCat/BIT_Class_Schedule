@@ -1,4 +1,3 @@
-// frontend/src/lib/__tests__/theme.test.ts
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applyTheme, getInitialTheme, persistTheme, resolveTheme } from '../theme';
 import { STORAGE_KEYS } from '../storage';

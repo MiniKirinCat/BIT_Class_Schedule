@@ -1,4 +1,3 @@
-// frontend/src/shared/today/ChangeBanner.tsx
 interface ChangeBannerProps {
   count: number;
   onClick: () => void;

@@ -1,4 +1,3 @@
-// frontend/src/shared/week/WeekDayList.tsx
 import { Fragment, useEffect, useState } from 'react';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {

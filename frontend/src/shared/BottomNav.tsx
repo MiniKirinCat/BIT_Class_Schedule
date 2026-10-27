@@ -1,4 +1,3 @@
-// frontend/src/shared/BottomNav.tsx
 export type PageKey = 'today' | 'week' | 'changes' | 'settings' | 'device';
 
 interface BottomNavProps {

@@ -1,4 +1,3 @@
-// frontend/src/shared/today/CourseDetailSheet.tsx
 import type { CourseSession } from '../../types';
 import { Sheet } from '../Sheet';
 

@@ -1,4 +1,3 @@
-// frontend/src/lib/__tests__/storage.test.ts
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { STORAGE_KEYS, useStoredChoice } from '../storage';

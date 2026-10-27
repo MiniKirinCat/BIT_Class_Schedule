@@ -1,4 +1,3 @@
-// frontend/src/shared/StaleBadge.tsx
 import type { AppStatus } from '../data/types';
 import type { ScheduleSnapshot } from '../types';
 import { formatDateTime } from '../lib/schedule';

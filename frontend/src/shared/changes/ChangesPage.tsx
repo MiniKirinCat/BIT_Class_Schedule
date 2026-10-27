@@ -1,4 +1,3 @@
-// frontend/src/shared/changes/ChangesPage.tsx
 import { useEffect } from 'react';
 import type { ChangeRecord } from '../../types';
 import {

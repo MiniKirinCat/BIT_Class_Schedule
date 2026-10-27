@@ -1,4 +1,3 @@
-// frontend/src/shared/week/WeekPage.tsx
 import { useState } from 'react';
 import type { CourseSession, ScheduleSnapshot, WeekLayout } from '../../types';
 import { currentWeek } from '../../lib/schedule';

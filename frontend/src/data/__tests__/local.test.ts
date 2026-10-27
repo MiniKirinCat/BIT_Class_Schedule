@@ -1,4 +1,3 @@
-// frontend/src/data/__tests__/local.test.ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api } from '../local';
 

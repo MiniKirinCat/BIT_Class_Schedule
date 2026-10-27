@@ -1,4 +1,3 @@
-// frontend/src/data/types.ts
 import type { CloudStatus, ScheduleSnapshot, SyncStatus } from '../types';
 
 export interface AppStatus {

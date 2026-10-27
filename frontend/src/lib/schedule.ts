@@ -1,4 +1,3 @@
-// frontend/src/lib/schedule.ts
 import type {
   CalendarEntry,
   ChangeRecord,

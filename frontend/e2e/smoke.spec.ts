@@ -1,4 +1,3 @@
-// frontend/e2e/smoke.spec.ts
 import { expect, test } from '@playwright/test';
 
 test('mobile local app: today layouts, week layouts, changes, and theme', async ({ page }) => {

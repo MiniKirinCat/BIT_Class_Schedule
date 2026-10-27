@@ -1,4 +1,3 @@
-// frontend/src/data/local.ts
 import type { AppSettings, AppStatus, SyncResult } from './types';
 
 export class ApiError extends Error {

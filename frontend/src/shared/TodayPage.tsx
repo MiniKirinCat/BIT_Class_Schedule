@@ -1,4 +1,3 @@
-// frontend/src/shared/TodayPage.tsx
 import type { CourseSession, ScheduleSnapshot, TodayLayout } from '../types';
 import { buildTodayModel, formatDateLabel } from '../lib/schedule';
 import { ChangeBanner } from './today/ChangeBanner';

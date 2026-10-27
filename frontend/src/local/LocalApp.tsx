@@ -1,4 +1,3 @@
-// frontend/src/local/LocalApp.tsx
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { CourseSession, ScheduleSnapshot, TodayLayout, WeekLayout } from '../types';
 import type { AppStatus } from '../data/types';

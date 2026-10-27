@@ -1,4 +1,3 @@
-// frontend/src/shared/AppShell.tsx
 import type { ReactNode } from 'react';
 import type { ScheduleSnapshot } from '../types';
 import { BottomNav, type PageKey } from './BottomNav';

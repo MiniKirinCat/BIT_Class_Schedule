@@ -1,4 +1,3 @@
-// frontend/src/shared/Sheet.tsx
 import { useEffect, useId, type ReactNode } from 'react';
 
 interface SheetProps {

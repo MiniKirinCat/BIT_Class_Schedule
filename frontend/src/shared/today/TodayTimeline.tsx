@@ -1,4 +1,3 @@
-// frontend/src/shared/today/TodayTimeline.tsx
 import { Fragment } from 'react';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {

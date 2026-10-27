@@ -1,4 +1,3 @@
-// frontend/src/lib/__tests__/schedule.test.ts
 import { describe, expect, it } from 'vitest';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {

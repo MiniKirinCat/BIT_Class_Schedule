@@ -1,4 +1,3 @@
-// frontend/src/shared/week/WeekGrid.tsx
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {
   coursesForWeek,

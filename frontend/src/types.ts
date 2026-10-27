@@ -1,4 +1,3 @@
-// frontend/src/types.ts
 export type TodayLayout = 'focus' | 'timeline' | 'compact';
 export type WeekLayout = 'grid' | 'list';
 export type ThemeName = 'warm' | 'fog';

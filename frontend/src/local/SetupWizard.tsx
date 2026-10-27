@@ -1,4 +1,3 @@
-// frontend/src/local/SetupWizard.tsx
 import { useState, type FormEvent } from 'react';
 import { api, messageFromError } from '../data/local';
 

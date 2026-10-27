@@ -1,4 +1,3 @@
-// frontend/src/lib/storage.ts
 import { useState } from 'react';
 import type { ThemeName, TodayLayout, WeekLayout } from '../types';
 

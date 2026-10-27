@@ -1,4 +1,3 @@
-// frontend/src/shared/today/TodayCompact.tsx
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {
   coursesForDate,

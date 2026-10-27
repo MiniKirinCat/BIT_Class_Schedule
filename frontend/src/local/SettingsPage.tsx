@@ -1,4 +1,3 @@
-// frontend/src/local/SettingsPage.tsx
 import { useEffect, useState, type FormEvent } from 'react';
 import type { ThemeName } from '../types';
 import type { AppSettings, AppStatus } from '../data/types';
