@@ -132,3 +132,33 @@ def test_failed_sync_run_defaults_cloud_status_to_skipped(tmp_path):
     run = repo.latest_sync_run()
     assert run is not None
     assert run["cloud_publish_status"] == "failed"
+
+
+def test_fail_interrupted_runs_marks_only_running_rows(tmp_path):
+    repo = SnapshotRepo(make_db(tmp_path))
+    running_id = repo.record_sync_run(
+        trigger="startup",
+        started_at="2026-10-25T12:00:00+08:00",
+        finished_at=None,
+        status="running",
+    )
+    finished_id = repo.record_sync_run(
+        trigger="manual",
+        started_at="2026-10-25T11:00:00+08:00",
+        finished_at="2026-10-25T11:00:05+08:00",
+        status="success",
+    )
+
+    assert repo.fail_interrupted_runs("2026-10-26T08:00:00+08:00") == 1
+    run = repo.latest_sync_run()
+    assert run is not None
+    assert run["id"] == finished_id
+    assert run["status"] == "success"
+
+    with repo.db.connect() as conn:
+        row = conn.execute("SELECT * FROM sync_runs WHERE id=?", (running_id,)).fetchone()
+    assert row["status"] == "failed"
+    assert row["error_code"] == "INTERRUPTED"
+    assert row["finished_at"] == "2026-10-26T08:00:00+08:00"
+
+    assert repo.fail_interrupted_runs("2026-10-26T09:00:00+08:00") == 0

@@ -187,6 +187,15 @@ class SnapshotRepo:
             row = conn.execute("SELECT * FROM sync_runs ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row else None
 
+    def fail_interrupted_runs(self, finished_at: str) -> int:
+        with self.db.connect() as conn:
+            cur = conn.execute(
+                "UPDATE sync_runs SET status='failed', finished_at=?, "
+                "error_code='INTERRUPTED', error_message=? WHERE status='running'",
+                (finished_at, "应用上次异常退出，同步未完成"),
+            )
+            return int(cur.rowcount)
+
     def save_snapshot(
         self,
         *,

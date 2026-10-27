@@ -138,6 +138,7 @@ def main() -> None:
             daemon=True,
         ).start()
 
+    socket.setdefaulttimeout(30)
     try:
         import uvicorn
 

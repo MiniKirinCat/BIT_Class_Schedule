@@ -536,3 +536,33 @@ def test_unhandled_errors_return_json_and_redact_log(tmp_path, monkeypatch, capl
     assert "supersecret" not in response.text
     assert "supersecret" not in caplog.text
     assert "unhandled API error" in caplog.text
+
+
+def test_lifespan_marks_interrupted_runs_failed(tmp_path):
+    config = AppConfig(
+        data_dir=tmp_path,
+        frontend_dir=tmp_path / "dist",
+        scheduler_enabled=False,
+    )
+    container = build_container(
+        config,
+        credentials=FakeCredentials(),
+        gateway=FakeGateway(),
+        notifier=FakeNotifier(),
+    )
+    container.db.initialize()
+    container.snapshots.record_sync_run(
+        trigger="startup",
+        started_at="2026-10-25T12:00:00+08:00",
+        finished_at=None,
+        status="running",
+    )
+    app = create_app(config, container)
+
+    with TestClient(app) as client:
+        assert client.get("/api/status").status_code == 200
+
+    run = container.snapshots.latest_sync_run()
+    assert run is not None
+    assert run["status"] == "failed"
+    assert run["error_code"] == "INTERRUPTED"

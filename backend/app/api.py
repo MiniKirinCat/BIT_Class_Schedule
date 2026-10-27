@@ -1,7 +1,9 @@
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 from math import ceil
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -16,6 +18,7 @@ from .security import CredentialError, redact, safe_message
 from .sync_service import SyncBusyError
 
 logger = logging.getLogger("next_class.api")
+TZ = ZoneInfo("Asia/Shanghai")
 
 
 class SchoolSetup(BaseModel):
@@ -156,6 +159,9 @@ def create_app(
         active = getattr(app.state, "container", None) or build_container(config)
         app.state.container = active
         active.db.initialize()
+        active.snapshots.fail_interrupted_runs(
+            datetime.now(TZ).isoformat(timespec="seconds")
+        )
         if active.settings.get("app_schema_version") is None:
             active.settings.set("app_schema_version", "1")
         if active.settings.get("sync_interval_days") is None:
