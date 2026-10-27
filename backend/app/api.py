@@ -1,4 +1,5 @@
 import json
+import logging
 from contextlib import asynccontextmanager
 from math import ceil
 
@@ -11,8 +12,10 @@ from pydantic import BaseModel, Field
 from .config import AppConfig
 from .container import Container, build_container
 from .schedule import PERIOD_TIMES
-from .security import CredentialError, redact
+from .security import CredentialError, redact, safe_message
 from .sync_service import SyncBusyError
+
+logger = logging.getLogger("next_class.api")
 
 
 class SchoolSetup(BaseModel):
@@ -176,6 +179,11 @@ def create_app(
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError):
         return JSONResponse(status_code=422, content={"detail": "请求参数不正确"})
+
+    @app.exception_handler(Exception)
+    async def unhandled_handler(request: Request, exc: Exception):
+        logger.error("unhandled API error: %s", safe_message(exc))
+        return JSONResponse(status_code=500, content={"detail": "服务内部错误"})
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

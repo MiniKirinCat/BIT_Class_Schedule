@@ -516,3 +516,23 @@ def test_lifespan_builds_container_when_none_injected(tmp_path):
         assert not active.notifier._client.is_closed
 
     assert active.notifier._client.is_closed
+
+
+def test_unhandled_errors_return_json_and_redact_log(tmp_path, monkeypatch, caplog):
+    app, _, _ = make_app(tmp_path, FakeGateway())
+
+    def explode():
+        raise RuntimeError("boom password=supersecret")
+
+    with caplog.at_level("ERROR", logger="next_class.api"):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            monkeypatch.setattr(
+                app.state.container.snapshots, "latest_sync_run", explode
+            )
+            response = client.get("/api/status")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "服务内部错误"}
+    assert "supersecret" not in response.text
+    assert "supersecret" not in caplog.text
+    assert "unhandled API error" in caplog.text
