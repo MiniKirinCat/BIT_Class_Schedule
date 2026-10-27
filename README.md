@@ -53,6 +53,8 @@ scripts\stop.ps1
 
 手机端是一个纯静态只读 PWA，不包含教务账号、同步按钮或 GitHub token。它只做三件事：拉取 Gist 密文、在本机浏览器解密、展示今天/周课表/变动。
 
+完整的 Git 推送、Pages 启用、token 权限、扫码配对、验收清单和排错步骤见 **[云端快照与手机端部署指引](docs/cloud-setup.md)**。
+
 ### 一次性部署
 
 1. 在 GitHub 创建一个仓库并推送本项目。GitHub Free 账号通常需要仓库为 public；私有仓库请先确认账号的 Pages 权限。
