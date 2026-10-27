@@ -111,7 +111,7 @@ https://minikirincat.github.io/BIT_Class_Schedule/
 
 在电脑浏览器打开这个地址。新浏览器应看到 **“连接快照”** 页面，而不是本地课表页。看到它说明 Pages 静态页面已经部署成功；此时还没有配置快照，所以不会显示课程。
 
-> 如果 `configure-pages` 仍报 `Get Pages site failed`，说明上面第 2 步的 Source 没有保存成 **GitHub Actions**。改好后重新运行工作流。
+> 如果 `configure-pages` 报 `HttpError: Not Found`、`Get Pages site failed` 或 `Resource not accessible by integration`，说明 Pages 还没有开启，或 Source 没有保存成 **GitHub Actions**。按上面第 1–3 步处理，然后重新运行工作流。
 
 ## 5. 创建云端快照 token
 
