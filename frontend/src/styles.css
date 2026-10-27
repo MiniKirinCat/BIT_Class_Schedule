@@ -165,7 +165,7 @@ p {
 }
 
 .button-primary {
-  color: var(--hero-text);
+  color: var(--on-primary);
   background: var(--primary);
   border-color: var(--primary);
 }
@@ -591,7 +591,7 @@ p {
 }
 
 .segmented button {
-  min-height: 38px;
+  min-height: 44px;
   padding: 7px 12px;
   border: 0;
   border-radius: 9px;
@@ -666,7 +666,7 @@ p {
 .time-cell {
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 3;
   display: grid;
   place-content: center;
   gap: 2px;

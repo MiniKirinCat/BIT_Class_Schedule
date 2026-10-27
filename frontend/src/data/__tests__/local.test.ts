@@ -45,6 +45,18 @@ describe('local API client', () => {
     );
   });
 
+  it('maps a network failure to a readable ApiError', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    await expect(api.status()).rejects.toThrow('无法连接本地服务');
+    try {
+      await api.status();
+    } catch (caught) {
+      expect(caught).toBeInstanceOf(ApiError);
+      expect((caught as ApiError).status).toBe(0);
+    }
+  });
+
   it('turns API errors into a readable ApiError', async () => {
     vi.stubGlobal(
       'fetch',

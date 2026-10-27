@@ -17,6 +17,7 @@ import {
 import { useTheme } from '../lib/theme';
 import { AppShell } from '../shared/AppShell';
 import { type PageKey } from '../shared/BottomNav';
+import { StaleBadge } from '../shared/StaleBadge';
 import { TodayPage } from '../shared/TodayPage';
 import { WeekPage } from '../shared/week/WeekPage';
 import { ChangesPage } from '../shared/changes/ChangesPage';
@@ -135,9 +136,10 @@ export function LocalApp() {
     return (
       <SetupWizard
         onComplete={async () => {
-          setShowSetup(false);
           await refresh();
+          setShowSetup(false);
         }}
+        onCancel={status.configured ? () => setShowSetup(false) : undefined}
       />
     );
   }
@@ -209,9 +211,19 @@ export function LocalApp() {
 
   return (
     <>
-      <AppShell snapshot={snapshot} page={page} onNavigate={setPage}>
+      <AppShell
+        snapshot={snapshot}
+        page={page}
+        onNavigate={setPage}
+        statusChip={<StaleBadge snapshot={snapshot} status={status} />}
+      >
         {loadError && <p className="form-error">{loadError}</p>}
-        {syncError && page !== 'settings' && (
+        {page !== 'settings' &&
+          (status.sync_status === 'failed' || status.sync_status === 'anomaly') &&
+          status.last_error && (
+            <p className="form-error">上次同步失败：{status.last_error}</p>
+          )}
+        {syncError && syncError !== status.last_error && page !== 'settings' && (
           <p className="form-error">{syncError}</p>
         )}
         {content}

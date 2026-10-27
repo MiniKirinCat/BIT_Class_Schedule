@@ -5,6 +5,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { SetupWizard } from '../SetupWizard';
 
 describe('SetupWizard', () => {
+  it('can cancel a re-login from the school step', async () => {
+    const onCancel = vi.fn();
+    render(
+      <SetupWizard
+        onComplete={vi.fn()}
+        onCancel={onCancel}
+        schoolApi={vi.fn()}
+        pushApi={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: '返回' }));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
   it('validates the school form and advances to the push step', async () => {
     const schoolApi = vi.fn().mockResolvedValue({ status: 'success' });
     const onComplete = vi.fn();

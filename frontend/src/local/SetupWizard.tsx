@@ -4,6 +4,7 @@ import { api, messageFromError } from '../data/local';
 
 interface SetupWizardProps {
   onComplete: () => void | Promise<void>;
+  onCancel?: () => void;
   schoolApi?: (username: string, password: string) => Promise<unknown>;
   pushApi?: (token: string, test: boolean) => Promise<unknown>;
 }
@@ -12,6 +13,7 @@ type Step = 'school' | 'push' | 'done';
 
 export function SetupWizard({
   onComplete,
+  onCancel,
   schoolApi = api.setupSchool,
   pushApi = api.setupPush,
 }: SetupWizardProps) {
@@ -103,6 +105,11 @@ export function SetupWizard({
               <button type="submit" className="button button-primary" disabled={busy}>
                 {busy ? '正在连接并同步…' : '连接并同步'}
               </button>
+              {onCancel && (
+                <button type="button" className="button" disabled={busy} onClick={onCancel}>
+                  返回
+                </button>
+              )}
             </div>
             <p className="form-hint">
               首次同步会读取当前学期课表；应用只监听 127.0.0.1，不会暴露到局域网。

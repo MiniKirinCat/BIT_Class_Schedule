@@ -164,7 +164,9 @@ export function SettingsPage({
             {syncStatusLabel}
           </span>
         </div>
-        {status.last_error && <p className="form-error">{status.last_error}</p>}
+        {status.last_error && status.last_error !== syncError && (
+          <p className="form-error">{status.last_error}</p>
+        )}
         {syncError && <p className="form-error">{syncError}</p>}
         <div className="form-actions">
           <button

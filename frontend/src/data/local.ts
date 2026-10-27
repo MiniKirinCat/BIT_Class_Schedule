@@ -16,10 +16,15 @@ export function messageFromError(error: unknown): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch {
+    throw new ApiError(0, '无法连接本地服务，请确认下一节正在运行');
+  }
   const payload = (await response.json().catch(() => null)) as
     | { detail?: unknown }
     | null;

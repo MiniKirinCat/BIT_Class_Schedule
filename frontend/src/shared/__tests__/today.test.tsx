@@ -2,6 +2,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { AppStatus } from '../../data/types';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import { TodayPage } from '../TodayPage';
 import { StaleBadge } from '../StaleBadge';
@@ -143,6 +144,34 @@ describe('Today layouts', () => {
       />,
     );
     expect(screen.getByText('数据可能已过期')).toBeInTheDocument();
+  });
+
+  it('surfaces a failed sync and cloud status in the header badge', () => {
+    const status: AppStatus = {
+      configured: true,
+      school_configured: true,
+      school_username: '20250001',
+      push_configured: false,
+      cloud_configured: true,
+      last_sync_at: SNAPSHOT.synced_at,
+      last_attempt_at: SNAPSHOT.synced_at,
+      next_due_at: null,
+      sync_status: 'failed',
+      last_error: '登录失败',
+      notification_error: null,
+      cloud_status: 'failed',
+      version: '0.1.0',
+    };
+    const { rerender } = render(<StaleBadge snapshot={SNAPSHOT} status={status} />);
+    expect(screen.getByText(/同步异常/)).toBeInTheDocument();
+
+    rerender(
+      <StaleBadge
+        snapshot={SNAPSHOT}
+        status={{ ...status, sync_status: 'success' }}
+      />,
+    );
+    expect(screen.getByText(/云端未更新/)).toBeInTheDocument();
   });
 });
 
