@@ -186,10 +186,13 @@ def create_app(
     async def validation_handler(request: Request, exc: RequestValidationError):
         return JSONResponse(status_code=422, content={"detail": "请求参数不正确"})
 
-    @app.exception_handler(Exception)
-    async def unhandled_handler(request: Request, exc: Exception):
-        logger.error("unhandled API error: %s", safe_message(exc))
-        return JSONResponse(status_code=500, content={"detail": "服务内部错误"})
+    @app.middleware("http")
+    async def catch_unhandled(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as exc:
+            logger.error("unhandled API error: %s", safe_message(exc))
+            return JSONResponse(status_code=500, content={"detail": "服务内部错误"})
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -254,6 +257,8 @@ def create_app(
         active = _container(request)
         if not active.sync_service.is_configured():
             raise HTTPException(status_code=400, detail="请先在设置中连接教务账号")
+        if active.sync_service.is_busy:
+            raise HTTPException(status_code=409, detail="同步正在进行中，请稍候")
         remaining = active.sync_service.manual_cooldown_remaining()
         if remaining > 0:
             minutes = max(1, ceil(remaining / 60))

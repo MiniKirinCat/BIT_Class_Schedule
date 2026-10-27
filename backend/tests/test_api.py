@@ -403,6 +403,28 @@ def test_dashboard_payload_contains_expected_fields(tmp_path):
         assert change["after"]["room"] == "A202"
 
 
+def test_manual_sync_reports_busy_before_cooldown(tmp_path):
+    gateway = FakeGateway()
+    app, _, _ = make_app(tmp_path, gateway)
+
+    with TestClient(app) as client:
+        setup = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": "pw"},
+        )
+        assert setup.status_code == 200
+
+        container = app.state.container
+        assert container.sync_service._worker_lock.acquire(blocking=False)
+        try:
+            response = client.post("/api/sync")
+        finally:
+            container.sync_service._worker_lock.release()
+
+        assert response.status_code == 409
+        assert "正在" in response.json()["detail"]
+
+
 def test_manual_sync_runs_after_cooldown_expires(tmp_path):
     gateway = FakeGateway()
     app, _, _ = make_app(tmp_path, gateway)
@@ -525,7 +547,7 @@ def test_unhandled_errors_return_json_and_redact_log(tmp_path, monkeypatch, capl
         raise RuntimeError("boom password=supersecret")
 
     with caplog.at_level("ERROR", logger="next_class.api"):
-        with TestClient(app, raise_server_exceptions=False) as client:
+        with TestClient(app) as client:
             monkeypatch.setattr(
                 app.state.container.snapshots, "latest_sync_run", explode
             )

@@ -115,6 +115,10 @@ class SyncService:
     def lock(self) -> asyncio.Lock:
         return self._lock
 
+    @property
+    def is_busy(self) -> bool:
+        return self._lock.locked() or self._worker_lock.locked()
+
     def is_configured(self) -> bool:
         try:
             return bool(
