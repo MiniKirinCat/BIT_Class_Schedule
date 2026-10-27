@@ -13,7 +13,7 @@ frontend/dist-cloud/
 *.tsbuildinfo
 
 # App data and secrets
-data/
+/data/
 *.db
 *.db-*
 *.sqlite

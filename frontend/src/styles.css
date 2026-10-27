@@ -1258,3 +1258,27 @@ p {
   display: block;
   font-size: 14px;
 }
+
+.theme-choice[data-theme-choice="warm"] .swatch-bg {
+  background: #f7f5ef;
+}
+
+.theme-choice[data-theme-choice="warm"] .swatch-primary {
+  background: #1f5c4a;
+}
+
+.theme-choice[data-theme-choice="warm"] .swatch-hero {
+  background: #173f33;
+}
+
+.theme-choice[data-theme-choice="fog"] .swatch-bg {
+  background: #f4f6f7;
+}
+
+.theme-choice[data-theme-choice="fog"] .swatch-primary {
+  background: #244c6b;
+}
+
+.theme-choice[data-theme-choice="fog"] .swatch-hero {
+  background: #1b3a50;
+}
