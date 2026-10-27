@@ -2,9 +2,9 @@
 
 本文是「下一节」云端只读快照的手动部署与验收步骤。完成后，电脑关机时手机仍可通过 GitHub Pages 打开只读课表；电脑端只负责同步和发布加密快照。
 
-> 当前仓库还没有 Git 远程地址。下面所有 GitHub 用户名、仓库名、Pages 地址和 token 都需要替换成你自己的值。不要把 token、二维码或解密密钥发到聊天、issue 或公开仓库里。
+> 仓库已创建并推送：<https://github.com/MiniKirinCat/BIT_Class_Schedule>。目标 Pages 地址是 <https://minikirincat.github.io/BIT_Class_Schedule/>，在手动开启 Pages 并完成首次部署后生效。不要把 token、二维码或解密密钥发到聊天、issue 或公开仓库里。
 
-## 0. 先理解两套凭据
+## 0. 先理解三类凭据
 
 | 凭据 | 用途 | 权限 | 存放位置 |
 |---|---|---|---|
@@ -14,88 +14,78 @@
 
 这三个东西用途不同。**不要把只勾选 `gist` 的 token 当成 Git 推送密码使用**；它没有仓库写权限。
 
-## 1. 准备本地仓库
+## 1. 确认本地仓库与远程
 
-在 PowerShell 中进入项目目录：
+仓库已经配置好 `origin`，`master` 也已包含云端改动：
 
 ```powershell
 cd D:\Qoder\Vibe_Coding
-git status
-```
-
-要求工作区干净。当前开发分支是 `feat/local-core`，`master` 还没有包含这次云端改动。先把 `master` 快进到最新提交：
-
-```powershell
-git switch master
-git merge --ff-only feat/local-core
+git remote -v
+git status --short --branch
 git log --oneline -3
 ```
 
-如果 `git switch master` 提示分支不存在，先执行：
+预期：
+
+- `origin` 指向 `https://github.com/MiniKirinCat/BIT_Class_Schedule.git`；
+- 当前分支是 `master`，与 `origin/master` 同步；
+- 最新提交包含云端快照与 Pages 工作流。
+
+以后修改代码后，用仓库约定的身份推送：
 
 ```powershell
-git branch --list
+git -c user.name="白泽" -c user.email="minikirincat@outlook.com" push origin master
 ```
 
-确认实际主分支名称，再按同样方式合并。
+Git Credential Manager 可能会打开浏览器要求登录 GitHub。不要把 PAT 拼进 remote URL。
 
-## 2. 创建 GitHub 仓库
+## 2. GitHub 仓库状态
 
-推荐在 GitHub 网页创建一个**空仓库**：
+仓库已经存在：
 
-1. 登录 GitHub。
-2. 点击右上角 **+ → New repository**。
-3. 填写仓库名，例如 `next-class`。
-4. 选择 **Public**。GitHub Free 的 GitHub Pages 通常要求 public 仓库；私有仓库请先确认你的账号/组织是否有 Pages 权限。
-5. **不要**勾选 “Add a README file”“Add .gitignore”“Choose a license”。空仓库可以避免第一次推送时产生 unrelated histories。
-6. 点击 **Create repository**。
+```text
+https://github.com/MiniKirinCat/BIT_Class_Schedule
+```
 
-如果已经创建了带 README 的仓库，最省事的做法是删除该空仓库后重新创建；否则需要先合并远程提交，容易把本地历史弄乱。
-
-### 可选：使用 GitHub CLI 创建
-
-如果你已安装并登录 `gh`：
+它是 public 仓库，默认分支是 `master`，不需要重复创建。如果你在另一台机器上重做这套部署，才需要新建一个**空的 public 仓库**（不要初始化 README、.gitignore 或 license），然后设置 remote：
 
 ```powershell
-gh auth login
-gh repo create next-class --public --source=. --remote=origin
+git remote add origin https://github.com/<你的用户名>/<仓库名>.git
 ```
-
-这只会创建远程仓库，不会自动推送。继续执行下面的推送步骤。
 
 ## 3. 推送 master
 
-当前仓库还没有 `origin`。添加远程地址：
+当前 `master` 已经推送。只有在提交了新改动后才需要再次推送：
 
 ```powershell
-git remote add origin https://github.com/<你的用户名>/next-class.git
+git status --short --branch
+git -c user.name="白泽" -c user.email="minikirincat@outlook.com" push origin master
 ```
 
-如果提示 `remote origin already exists`，改用：
+如果提示 `origin` 已存在但地址不对：
 
 ```powershell
-git remote set-url origin https://github.com/<你的用户名>/next-class.git
+git remote set-url origin https://github.com/MiniKirinCat/BIT_Class_Schedule.git
 ```
 
-推送分支。Git Credential Manager 可能会打开浏览器要求登录 GitHub：
+> 如果 Git 要求输入密码，请使用有仓库写权限的 GitHub PAT（不是只勾选 `gist` 的云端 token），或使用 Git Credential Manager / `gh auth login` 的浏览器登录。
 
-```powershell
-git -c user.name="白泽" -c user.email="minikirincat@outlook.com" push -u origin master
+## 4. 启用 GitHub Pages（必须手动一次）
+
+GitHub 不允许 Actions 自带的 `GITHUB_TOKEN` 创建 Pages 站点。工作流尝试自动启用时会失败：
+
+```text
+Resource not accessible by integration
+https://docs.github.com/rest/pages/pages#create-a-apiname-pages-site
 ```
 
-> 如果 Git 要求输入密码，请使用有仓库写权限的 GitHub PAT（不是只勾选 `gist` 的云端 token），或使用 Git Credential Manager / `gh auth login` 的浏览器登录。不要把 PAT 拼进 remote URL。
+所以首次启用必须由仓库管理员在网页上完成：
 
-推送后，如果 GitHub 仓库默认分支是 `main`：
-
-1. 打开仓库 **Settings → General → Default branch**。
-2. 把默认分支改为 `master`。
-3. 保存。
-
-## 4. 启用 GitHub Pages
-
-1. 打开仓库 **Settings → Pages**。
+1. 打开 <https://github.com/MiniKirinCat/BIT_Class_Schedule/settings/pages>。
 2. 在 **Build and deployment → Source** 中选择 **GitHub Actions**。
-3. 不要选择 “Deploy from a branch”；本项目的 Pages 由 `.github/workflows/pages.yml` 构建。
+3. 如果页面出现 **Save**，点击保存；没有 Save 按钮说明选择已立即生效。
+4. 打开 <https://github.com/MiniKirinCat/BIT_Class_Schedule/actions/workflows/pages.yml>。
+5. 选择最新的 **Deploy cloud PWA** 运行，点击 **Re-run all jobs**；如果列表为空，点击 **Run workflow**，分支选 `master`。
 
 工作流位于：
 
@@ -103,33 +93,25 @@ git -c user.name="白泽" -c user.email="minikirincat@outlook.com" push -u origi
 .github/workflows/pages.yml
 ```
 
-它会在推送到 `master` 时自动运行，也可以在 **Actions → Deploy cloud PWA → Run workflow** 手动运行。运行内容：
+以后推送到 `master`（涉及 `frontend/**` 或工作流）会自动运行：
 
 - `npm ci`
 - `npm run build:cloud`
 - 上传 `frontend/dist-cloud` 到 Pages
 
-### 第一次运行失败怎么办
+`build` 和 `deploy` 两个 job 都变绿后：
 
-如果第一次自动运行在 `configure-pages` 步骤失败，通常是因为 Pages 还没有设置为 GitHub Actions：
-
-1. 回到 **Settings → Pages**，确认 Source 是 **GitHub Actions**。
-2. 打开 **Actions → Deploy cloud PWA**。
-3. 点击 **Re-run all jobs**，或 **Run workflow** 选择 `master` 重新运行。
-
-等待 `build` 和 `deploy` 两个 job 都变绿。成功后：
-
-- **Settings → Pages** 会显示 “Your site is live at ...”。
-- `deploy` job 的日志里会有 `page_url`。
-- 地址通常是：
+- **Settings → Pages** 会显示 “Your site is live at ...”；
+- `deploy` job 的日志里会有 `page_url`；
+- 地址是：
 
 ```text
-https://<你的用户名>.github.io/next-class/
+https://minikirincat.github.io/BIT_Class_Schedule/
 ```
 
-如果是 `<用户名>.github.io` 仓库，则是 `https://<用户名>.github.io/`。
-
 在电脑浏览器打开这个地址。新浏览器应看到 **“连接快照”** 页面，而不是本地课表页。看到它说明 Pages 静态页面已经部署成功；此时还没有配置快照，所以不会显示课程。
+
+> 如果 `configure-pages` 仍报 `Get Pages site failed`，说明上面第 2 步的 Source 没有保存成 **GitHub Actions**。改好后重新运行工作流。
 
 ## 5. 创建云端快照 token
 
@@ -137,7 +119,7 @@ https://<你的用户名>.github.io/next-class/
 2. 左侧最下方 **Developer settings**。
 3. **Personal access tokens → Tokens (classic)**。
 4. **Generate new token (classic)**。
-5. Note 填 `next-class gist`，Expiration 按你的习惯选择（建议 90 天，并设日历提醒）。
+5. Note 填 `BIT_Class_Schedule gist`，Expiration 按你的习惯选择（建议 90 天，并设日历提醒）。
 6. 只勾选 **`gist`**。不要勾选 `repo`、`workflow`、`admin` 等权限。
 7. 点击 **Generate token**，立即复制以 `ghp_` 开头的值。
 
@@ -176,7 +158,7 @@ https://<你的用户名>.github.io/next-class/
 进入 **设置 → 云端快照**：
 
 1. **GitHub token**：粘贴第 5 步复制的 `ghp_...` token。
-2. **GitHub Pages 地址**：填写第 4 步得到的 HTTPS 地址，例如 `https://alice.github.io/next-class/`。
+2. **GitHub Pages 地址**：填写 `https://minikirincat.github.io/BIT_Class_Schedule/`。如果你 fork 了仓库，换成自己的 Pages 地址。
 3. **已有 Gist ID**：第一次留空。应用会自动创建一个 **secret Gist**。
 4. 点击 **保存并发布**。
 
@@ -260,7 +242,7 @@ https://gist.github.com/<你的用户名>/<Gist ID>
 - 确认 **Settings → Pages → Source** 是 **GitHub Actions**。
 - 确认最新一次 `deploy` job 成功。
 - GitHub Pages 第一次部署可能需要 1–3 分钟。
-- 确认地址末尾有仓库名和斜杠，例如 `https://<用户名>.github.io/next-class/`。
+- 确认地址末尾有仓库名和斜杠：`https://minikirincat.github.io/BIT_Class_Schedule/`。
 - 如果资源 404，检查工作流是否构建的是 `dist-cloud`，而不是本地 `dist-local`。
 
 ### 保存云端配置报“GitHub token 无效、没有 gist 权限，或触发了速率限制”

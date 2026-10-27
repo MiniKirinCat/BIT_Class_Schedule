@@ -57,10 +57,10 @@ scripts\stop.ps1
 
 ### 一次性部署
 
-1. 在 GitHub 创建一个仓库并推送本项目。GitHub Free 账号通常需要仓库为 public；私有仓库请先确认账号的 Pages 权限。
-2. 打开仓库 **Settings → Pages**，把 **Build and deployment → Source** 设为 **GitHub Actions**。
-3. 推送到 `master`，或在 **Actions → Deploy cloud PWA → Run workflow** 手动运行一次。工作流会执行 `npm run build:cloud` 并把 `frontend/dist-cloud` 发布到 Pages。
-4. 记录 Pages 地址，形如 `https://<用户名>.github.io/<仓库名>/`。
+1. 仓库已创建并推送：<https://github.com/MiniKirinCat/BIT_Class_Schedule>（public，`master`）。
+2. 打开仓库 **Settings → Pages**，把 **Build and deployment → Source** 设为 **GitHub Actions**。GitHub 不允许 Actions 自带的 token 创建 Pages，所以这一次必须手动；之后部署全自动。
+3. 到 **Actions → Deploy cloud PWA** 点击 **Re-run all jobs**（或 **Run workflow**）。工作流会执行 `npm run build:cloud` 并把 `frontend/dist-cloud` 发布到 Pages。
+4. Pages 地址：`https://minikirincat.github.io/BIT_Class_Schedule/`。
 5. 在 GitHub **Settings → Developer settings → Personal access tokens → Tokens (classic)** 创建一个只勾选 `gist` 权限的 token。Gist API 目前建议使用 classic token。
 
 ### 配对手机
@@ -156,6 +156,6 @@ npm run e2e
 - GitHub 可达性、PushPlus 配额、教务系统接口变更都可能影响使用。
 - 电脑关机期间不会产生新的同步或提醒；手机端只读，没有后台同步或推送。
 - 云端 PWA 没有 Service Worker（按设计不做离线应用壳）；断网时只有在页面已加载的情况下才能使用本机缓存。
-- GitHub 仓库创建和 Pages 启用是一次性手工步骤；Pages 地址需要手动填入设置。
+- GitHub Pages 必须由仓库管理员手动开启一次（Actions token 无权创建 Pages）；开启后后续部署自动。Pages 地址需要手动填入设置。
 - GitHub Gist API 的未登录回退请求有速率限制；正常使用 raw 地址或手机缓存不受影响。
 - 如果本地快照超过 14 天且今天不在日历切片内，页面会按学期起始日推算周次并标注“推算”，不会额外重新登录抓取当天日历。

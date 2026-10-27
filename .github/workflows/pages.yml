@@ -33,9 +33,8 @@ jobs:
       - name: Build read-only cloud app
         working-directory: frontend
         run: npm run build:cloud
+      # GitHub 不允许 GITHUB_TOKEN 创建 Pages；首次启用需在仓库设置中手动完成
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist-cloud
