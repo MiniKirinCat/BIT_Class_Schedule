@@ -20,7 +20,7 @@ export function WeekPage({
   onOpenCourse,
 }: WeekPageProps) {
   const thisWeek = currentWeek(snapshot, today);
-  const [week, setWeek] = useState(thisWeek);
+  const [week, setWeek] = useState(Math.max(1, thisWeek));
 
   return (
     <section className="week-page">
@@ -54,7 +54,7 @@ export function WeekPage({
           <button
             type="button"
             className="ghost-button"
-            onClick={() => setWeek((value) => value - 1)}
+            onClick={() => setWeek((value) => Math.max(1, value - 1))}
             aria-label="上一周"
           >
             ‹

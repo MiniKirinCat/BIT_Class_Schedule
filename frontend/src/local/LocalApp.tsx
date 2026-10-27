@@ -77,6 +77,20 @@ export function LocalApp() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => void refresh(), 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [refresh]);
+
   const handleSync = useCallback(async () => {
     setSyncBusy(true);
     setSyncError('');
@@ -147,7 +161,19 @@ export function LocalApp() {
   const today = dateKeyInShanghai(now);
 
   let content: ReactNode = null;
-  if (!snapshot) {
+  if (page === 'settings') {
+    content = (
+      <SettingsPage
+        status={status}
+        theme={theme}
+        onThemeChange={setTheme}
+        onRelogin={() => setShowSetup(true)}
+        onSync={handleSync}
+        syncBusy={syncBusy}
+        syncError={syncError}
+      />
+    );
+  } else if (!snapshot) {
     content = (
       <div className="empty-state">
         <strong>还没有课表快照</strong>
@@ -179,18 +205,6 @@ export function LocalApp() {
         changes={snapshot.changes}
         lastSeenId={lastSeenId}
         onSeen={markSeen}
-      />
-    );
-  } else if (page === 'settings') {
-    content = (
-      <SettingsPage
-        status={status}
-        theme={theme}
-        onThemeChange={setTheme}
-        onRelogin={() => setShowSetup(true)}
-        onSync={handleSync}
-        syncBusy={syncBusy}
-        syncError={syncError}
       />
     );
   } else {

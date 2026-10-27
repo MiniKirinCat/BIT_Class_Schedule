@@ -158,17 +158,17 @@ def create_app(
     async def lifespan(app: FastAPI):
         active = getattr(app.state, "container", None) or build_container(config)
         app.state.container = active
-        active.db.initialize()
-        active.snapshots.fail_interrupted_runs(
-            datetime.now(TZ).isoformat(timespec="seconds")
-        )
-        if active.settings.get("app_schema_version") is None:
-            active.settings.set("app_schema_version", "1")
-        if active.settings.get("sync_interval_days") is None:
-            active.settings.set_int("sync_interval_days", 1)
-        if config.scheduler_enabled:
-            active.scheduler.start(initial_trigger="startup")
         try:
+            active.db.initialize()
+            active.snapshots.fail_interrupted_runs(
+                datetime.now(TZ).isoformat(timespec="seconds")
+            )
+            if active.settings.get("app_schema_version") is None:
+                active.settings.set("app_schema_version", "1")
+            if active.settings.get("sync_interval_days") is None:
+                active.settings.set_int("sync_interval_days", 1)
+            if config.scheduler_enabled:
+                active.scheduler.start(initial_trigger="startup")
             yield
         finally:
             try:

@@ -46,7 +46,9 @@ export function useStoredChoice<T extends string>(
 }
 
 export function defaultWeekLayout(): WeekLayout {
-  if (typeof window === 'undefined') return 'list';
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'list';
+  }
   return window.matchMedia('(min-width: 900px)').matches ? 'grid' : 'list';
 }
 
