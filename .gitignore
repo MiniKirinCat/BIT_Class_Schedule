@@ -27,3 +27,6 @@ secrets/
 .superpowers/
 .DS_Store
 Thumbs.db
+
+frontend/playwright-report/
+frontend/test-results/
