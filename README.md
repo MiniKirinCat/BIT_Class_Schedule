@@ -1,8 +1,8 @@
 # 下一节
 
-北京理工大学个人课表工具：从教务系统自动同步课表，打开就能看到今天和下一节；课表变化时通过 PushPlus 发一条微信提醒。
+北京理工大学个人课表工具：从教务系统自动同步课表，打开就能看到今天和下一节；课表变化时通过 PushPlus 发一条微信提醒；电脑关机时，手机仍可通过 GitHub Pages 上的只读 PWA 查看最后一次加密快照。
 
-这是单用户、本地优先的工具。本地服务只监听 `127.0.0.1`，不开放局域网；课表和设置存本机 SQLite，密码、token 只进 Windows 凭据管理器。
+这是单用户、本地优先的工具。本地服务只监听 `127.0.0.1`，不开放局域网；课表和设置存本机 SQLite，密码、token 只进 Windows 凭据管理器。云端 Gist 只保存 AES-256-GCM 密文，手机在浏览器内解密。
 
 ## 环境
 
@@ -19,7 +19,7 @@
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 ```
 
-脚本会创建 `.venv`、安装后端依赖、安装前端依赖并构建 `frontend\dist-local`，同时创建 `data` 目录。
+脚本会创建 `.venv`、安装后端依赖、安装前端依赖并构建本地管理端 `frontend\dist-local`，同时创建 `data` 目录。云端只读页面由 GitHub Actions 单独构建 `frontend\dist-cloud`，本地日常使用不需要构建它。
 
 ## 启动与停止
 
@@ -44,9 +44,38 @@ scripts\stop.ps1
 
 1. 输入学号和密码，点击“连接并同步”。密码只发给本机服务，再写入 Windows 凭据管理器。
 2. 可选填 PushPlus token 并发送测试提醒；也可以跳过。
-3. 完成后进入今天页。布局按钮可切换三种今天布局；周课表页可切换整周/单日。
+3. 可选配置云端快照：填写 GitHub token 和 Pages 地址，应用会自动创建 secret Gist、加密发布当前课表并生成手机二维码；也可以跳过。
+4. 完成后进入今天页。布局按钮可切换三种今天布局；周课表页可切换整周/单日。
 
 如果 keyring 不可用，应用会明确报错并停止保存敏感信息，不会退化成明文文件。
+
+## 云端快照与手机端
+
+手机端是一个纯静态只读 PWA，不包含教务账号、同步按钮或 GitHub token。它只做三件事：拉取 Gist 密文、在本机浏览器解密、展示今天/周课表/变动。
+
+### 一次性部署
+
+1. 在 GitHub 创建一个仓库并推送本项目。GitHub Free 账号通常需要仓库为 public；私有仓库请先确认账号的 Pages 权限。
+2. 打开仓库 **Settings → Pages**，把 **Build and deployment → Source** 设为 **GitHub Actions**。
+3. 推送到 `master`，或在 **Actions → Deploy cloud PWA → Run workflow** 手动运行一次。工作流会执行 `npm run build:cloud` 并把 `frontend/dist-cloud` 发布到 Pages。
+4. 记录 Pages 地址，形如 `https://<用户名>.github.io/<仓库名>/`。
+5. 在 GitHub **Settings → Developer settings → Personal access tokens → Tokens (classic)** 创建一个只勾选 `gist` 权限的 token。Gist API 目前建议使用 classic token。
+
+### 配对手机
+
+1. 本地启动「下一节」，进入 **设置 → 云端快照**，填写 GitHub token 和 Pages 地址，点击 **保存并发布**。应用会自动创建或更新 secret Gist，并生成二维码。
+2. 手机扫描二维码。PWA 会从 URL fragment 导入 Gist 地址和密钥，然后立即清除地址栏中的 fragment；密钥只保存在该浏览器的 localStorage。
+3. 在手机浏览器菜单中选择“添加到主屏幕”。之后打开图标即可查看最后一次快照；电脑关机也不影响。
+4. 以后每次成功同步都会自动重新加密并发布快照。手机重新打开或回到前台时会尝试拉取；也可以在 **设备 → 重新拉取** 手动更新。
+
+### 云端数据规则
+
+- 发布内容遵循设计中的快照结构：课程、最近 50 条变动、14 天日历切片、节次时间；不含学号、姓名、密码、Cookie 或 GitHub token。
+- 加密使用 AES-256-GCM，12 字节随机 nonce；Gist 中只有 `snapshot.enc.json` 密文信封。
+- 解密密钥是 32 字节随机值，保存在 Windows 凭据管理器和手机 localStorage。二维码本身包含密钥，不要截图或转发。
+- 拉取顺序：Gist raw 地址 → GitHub Gist API → 本机缓存。网络失败时可显示缓存；**密钥错误或数据损坏时不会回退到缓存**，以免把旧数据误认为最新课表。
+- 超过同步间隔 + 24 小时，云端页面会显示“数据可能已过期”。
+- **重置配对密钥**会让旧二维码立即失效，需要重新扫码；Gist 会重新发布为新密钥的密文。
 
 ## 同步规则
 
@@ -60,10 +89,12 @@ scripts\stop.ps1
 ## 隐私与安全
 
 - 本地服务只绑定 `127.0.0.1`，无 CORS、无 LAN/PIN。
-- 学号密码、PushPlus token 存在 Windows 凭据管理器；SQLite、日志、前端产物中不保存这些值。
+- 学号密码、PushPlus token、GitHub token、快照密钥都存在 Windows 凭据管理器；SQLite、日志、前端产物中不保存这些值。
 - 日志轮转 1 MB × 3，写入前对密码、token、Cookie、Authorization、URL 查询参数脱敏。
 - 课表数据在 `data\next_class.db`；日志在 `data\app.log`。
-- 云端只读快照（加密 Gist + GitHub Pages）是下一份实现计划的范围；本计划不包含云端凭据或上传。
+- Gist 只保存密文。GitHub Pages 上只有静态代码，不含 token、账号或密钥。
+- 二维码由本地 `/api/setup/qr` 生成，响应禁止缓存；只在 `127.0.0.1` 可访问。
+- 手机端明文快照缓存在站点 localStorage；清除站点数据或点击“清除本机数据”会移除。
 
 ## 开发
 
@@ -79,6 +110,7 @@ scripts\stop.ps1
 cd frontend
 npm run test
 npm run build:local
+npm run build:cloud
 ```
 
 本地开发时先启动后端：
@@ -99,15 +131,14 @@ npm run dev
 ```bash
 cd frontend
 npx playwright install chromium
-npm run build:local
 npm run e2e
 ```
 
-冒烟测试使用假数据服务 `scripts/dev_fixture_server.py`，不会访问真实教务系统，也不需要账号密码。
+`npm run e2e` 会先构建 `dist-local` 和 `dist-cloud`。冒烟测试使用假数据服务 `scripts/dev_fixture_server.py` 与 `scripts/dev_cloud_fixture_server.py`，不会访问真实教务系统或 GitHub，也不需要账号密码。
 
 ## 主要依赖
 
-- 后端：FastAPI、Uvicorn、Pydantic、httpx、keyring、cryptography、pytest、pytest-asyncio、BIT-Login-Python。
+- 后端：FastAPI、Uvicorn、Pydantic、httpx、keyring、cryptography、qrcode、pytest、pytest-asyncio、BIT-Login-Python。
 - 前端：React、Vite、TypeScript、Vitest、React Testing Library、Playwright。
 - 版本由 `backend/requirements.txt` 和 `frontend/package-lock.json` 锁定。
 
@@ -121,5 +152,8 @@ npm run e2e
 
 - 需要校园网或 WebVPN；遇到短信验证码时 V1 不支持交互式验证。
 - GitHub 可达性、PushPlus 配额、教务系统接口变更都可能影响使用。
-- 电脑关机期间不会产生新的同步或提醒。
+- 电脑关机期间不会产生新的同步或提醒；手机端只读，没有后台同步或推送。
+- 云端 PWA 没有 Service Worker（按设计不做离线应用壳）；断网时只有在页面已加载的情况下才能使用本机缓存。
+- GitHub 仓库创建和 Pages 启用是一次性手工步骤；Pages 地址需要手动填入设置。
+- GitHub Gist API 的未登录回退请求有速率限制；正常使用 raw 地址或手机缓存不受影响。
 - 如果本地快照超过 14 天且今天不在日历切片内，页面会按学期起始日推算周次并标注“推算”，不会额外重新登录抓取当天日历。

@@ -14,11 +14,11 @@ from .change_detector import (
     empty_confirmed_event,
     format_change_message,
 )
+from .cloud import build_cloud_payload, changes_payload
 from .config import AppConfig
 from .db import SettingsRepo, SnapshotRepo
 from .models import ChangeEvent, CourseSession, FetchedSchedule, SyncResult
 from .normalizer import NormalizationError, normalize
-from .schedule import PERIOD_TIMES
 from .school_gateway import SchoolError
 from .security import CredentialError, redact, safe_message
 
@@ -31,6 +31,8 @@ class SyncBusyError(Exception):
 
 
 class CloudPublisher(Protocol):
+    def is_configured(self) -> bool: ...
+
     def publish(self, payload: dict) -> None: ...
 
 
@@ -59,30 +61,6 @@ def _snapshot_hash(term: str, first_day: str, sessions: list[CourseSession]) -> 
         sort_keys=True,
     )
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-
-def _changes_payload(rows: list[dict]) -> list[dict]:
-    result = []
-    for row in rows:
-        try:
-            details = json.loads(row.get("details_json") or "{}")
-        except ValueError:
-            details = {}
-        if not isinstance(details, dict):
-            details = {}
-        result.append(
-            {
-                "id": row["id"],
-                "detected_at": row["detected_at"],
-                "type": row["type"],
-                "course_code": row["course_code"],
-                "course_name": row["course_name"],
-                "summary": row["summary"],
-                "before": details.get("before"),
-                "after": details.get("after"),
-            }
-        )
-    return result
 
 
 class SyncService:
@@ -411,24 +389,28 @@ class SyncService:
     ) -> str:
         if self._publisher is None:
             return "skipped"
+        try:
+            configured = self._publisher.is_configured()
+        except Exception as exc:
+            message = safe_message(exc)
+            self._settings.set("last_cloud_error", message)
+            self._logger.warning("cloud configuration check failed: %s", message)
+            return "failed"
+        if not configured:
+            return "skipped"
 
-        payload = {
-            "schema_version": 1,
-            "app_version": self._config.app_version,
-            "synced_at": finished,
-            "sync_interval_days": self._settings.get_int("sync_interval_days", 1),
-            "term": fetched.term,
-            "first_day": fetched.first_day.isoformat(),
-            "courses": [session.to_dict() for session in sessions],
-            "changes": _changes_payload(
+        payload = build_cloud_payload(
+            app_version=self._config.app_version,
+            synced_at=finished,
+            sync_interval_days=self._settings.get_int("sync_interval_days", 1),
+            term=fetched.term,
+            first_day=fetched.first_day.isoformat(),
+            sessions=sessions,
+            changes=changes_payload(
                 self._snapshots.changes_for_term(fetched.term, limit=50)
             ),
-            "calendar": [entry.to_dict() for entry in fetched.calendar],
-            "period_times": [
-                {"index": period.index, "start": period.start, "end": period.end}
-                for period in PERIOD_TIMES
-            ],
-        }
+            calendar=fetched.calendar,
+        )
 
         try:
             self._publisher.publish(payload)

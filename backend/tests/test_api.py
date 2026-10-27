@@ -1,8 +1,11 @@
+import json
 from datetime import date
 
+import httpx
 from fastapi.testclient import TestClient
 
 from app.api import create_app
+from app.cloud import GistClient
 from app.config import AppConfig
 from app.container import build_container
 from app.models import CalendarEntry, FetchedSchedule
@@ -98,6 +101,7 @@ def make_app(
     frontend_dir=None,
     credentials=None,
     notifier=None,
+    cloud_client=None,
 ):
     config = AppConfig(
         data_dir=tmp_path,
@@ -111,6 +115,7 @@ def make_app(
         credentials=credentials,
         gateway=gateway,
         notifier=notifier,
+        cloud_client=cloud_client,
     )
     return create_app(config, container), credentials, notifier
 
@@ -214,6 +219,11 @@ def test_settings_validation_and_update(tmp_path):
             "school_configured": False,
             "push_configured": False,
             "cloud_configured": False,
+            "cloud_pages_url": None,
+            "cloud_gist_id": None,
+            "cloud_last_publish_at": None,
+            "cloud_last_error": None,
+            "cloud_qr_ready": False,
         }
 
         updated = client.put(
@@ -330,6 +340,176 @@ def test_school_setup_credential_failure_returns_503(tmp_path):
         assert response.status_code == 503
         assert "凭据管理器" in response.json()["detail"]
         assert password not in response.json()["detail"]
+
+
+class GistApiState:
+    token = "ghp-api-token"
+
+    def __init__(self):
+        self.requests = []
+        self.content = ""
+        self.revision = 1
+
+    def payload(self):
+        return {
+            "id": "gist-api",
+            "html_url": "https://gist.github.com/alice/gist-api",
+            "owner": {"login": "alice"},
+            "files": {
+                "snapshot.enc.json": {
+                    "raw_url": (
+                        "https://gist.githubusercontent.com/alice/gist-api/"
+                        f"raw/rev{self.revision}/snapshot.enc.json"
+                    ),
+                    "content": self.content,
+                }
+            },
+        }
+
+    def transport(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.requests.append(
+                {
+                    "method": request.method,
+                    "body": json.loads(request.content or b"{}"),
+                }
+            )
+            if request.headers.get("Authorization") != f"Bearer {self.token}":
+                return httpx.Response(401, json={"message": "Bad credentials"})
+            if request.method == "POST" and request.url.path == "/gists":
+                self.content = json.loads(request.content)["files"][
+                    "snapshot.enc.json"
+                ]["content"]
+                return httpx.Response(201, json=self.payload())
+            if request.method == "GET" and request.url.path == "/gists/gist-api":
+                return httpx.Response(200, json=self.payload())
+            if request.method == "PATCH" and request.url.path == "/gists/gist-api":
+                self.revision += 1
+                self.content = json.loads(request.content)["files"][
+                    "snapshot.enc.json"
+                ]["content"]
+                return httpx.Response(200, json=self.payload())
+            return httpx.Response(404, json={"message": "Not Found"})
+
+        return httpx.MockTransport(handler)
+
+
+def test_cloud_setup_publish_qr_and_key_reset(tmp_path):
+    state = GistApiState()
+    gateway = FakeGateway()
+    app, credentials, _ = make_app(
+        tmp_path,
+        gateway,
+        cloud_client=GistClient(transport=state.transport()),
+    )
+
+    with TestClient(app) as client:
+        assert client.get("/api/setup/qr").status_code == 400
+        setup = client.post(
+            "/api/setup/school",
+            json={"username": "20250001", "password": "pw"},
+        )
+        assert setup.status_code == 200
+
+        status = client.get("/api/status").json()
+        assert status["cloud_configured"] is False
+        assert status["cloud_qr_ready"] is False
+
+        invalid = client.post(
+            "/api/setup/cloud",
+            json={"token": "ghp-api-token", "pages_url": "http://example.com"},
+        )
+        assert invalid.status_code == 422
+        assert "https://" in invalid.json()["detail"]
+
+        cloud = client.post(
+            "/api/setup/cloud",
+            json={
+                "token": "ghp-api-token",
+                "pages_url": "https://alice.github.io/next-class",
+            },
+        )
+        assert cloud.status_code == 200
+        body = cloud.json()
+        assert body["configured"] is True
+        assert body["published"] is True
+        assert body["qr_ready"] is True
+        assert body["pages_url"] == "https://alice.github.io/next-class/"
+        assert credentials.get("github_token") == "ghp-api-token"
+        assert credentials.get("snapshot_key")
+        assert "高等数学" not in state.content
+
+        status = client.get("/api/status").json()
+        assert status["cloud_configured"] is True
+        assert status["cloud_qr_ready"] is True
+        assert status["cloud_gist_id"] == "gist-api"
+        assert status["cloud_pages_url"] == "https://alice.github.io/next-class/"
+        assert status["cloud_last_publish_at"]
+        assert status["cloud_last_error"] == ""
+
+        settings = client.get("/api/settings").json()
+        assert settings["cloud_configured"] is True
+        assert settings["cloud_qr_ready"] is True
+
+        qr = client.get("/api/setup/qr")
+        assert qr.status_code == 200
+        assert qr.headers["content-type"].startswith("image/svg+xml")
+        assert qr.headers["cache-control"] == "no-store"
+        assert qr.text.startswith("<svg")
+
+        published = client.post("/api/cloud/publish")
+        assert published.status_code == 200
+        assert published.json()["status"] == "success"
+
+        before_sync = state.content
+        gateway.raw = FetchedSchedule(
+            term=gateway.raw.term,
+            first_day=gateway.raw.first_day,
+            rows=[{**ROW, "JASMC": "A202"}],
+            calendar=gateway.raw.calendar,
+        )
+        app.state.container.settings.set(
+            "last_attempt_sync_at", "2020-01-01T00:00:00+08:00"
+        )
+        synced = client.post("/api/sync")
+        assert synced.status_code == 200
+        assert synced.json()["cloud_status"] == "success"
+        assert state.content != before_sync
+        assert app.state.container.settings.get("last_cloud_publish_at")
+
+        old_key = credentials.get("snapshot_key")
+        reset = client.post("/api/cloud/reset-key")
+        assert reset.status_code == 200
+        assert reset.json()["published"] is True
+        assert credentials.get("snapshot_key") != old_key
+
+
+def test_cloud_setup_rejects_bad_token_and_missing_token(tmp_path):
+    state = GistApiState()
+    app, _, _ = make_app(
+        tmp_path,
+        FakeGateway(),
+        cloud_client=GistClient(transport=state.transport()),
+    )
+
+    with TestClient(app) as client:
+        missing = client.post(
+            "/api/setup/cloud",
+            json={"pages_url": "https://alice.github.io/next-class"},
+        )
+        assert missing.status_code == 422
+        assert "token" in missing.json()["detail"]
+
+        bad = client.post(
+            "/api/setup/cloud",
+            json={
+                "token": "wrong-token",
+                "pages_url": "https://alice.github.io/next-class",
+            },
+        )
+        assert bad.status_code == 502
+        assert "token" in bad.json()["detail"]
+        assert client.get("/api/status").json()["cloud_configured"] is False
 
 
 def test_dashboard_payload_contains_expected_fields(tmp_path):

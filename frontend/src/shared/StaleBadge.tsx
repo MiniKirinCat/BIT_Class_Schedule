@@ -5,9 +5,16 @@ import { formatDateTime } from '../lib/schedule';
 interface StaleBadgeProps {
   snapshot: ScheduleSnapshot | null;
   status?: AppStatus;
+  cached?: boolean;
+  verboseSyncTime?: boolean;
 }
 
-export function StaleBadge({ snapshot, status }: StaleBadgeProps) {
+export function StaleBadge({
+  snapshot,
+  status,
+  cached = false,
+  verboseSyncTime = false,
+}: StaleBadgeProps) {
   if (!snapshot) {
     return <span className="status-chip">尚未同步</span>;
   }
@@ -32,12 +39,23 @@ export function StaleBadge({ snapshot, status }: StaleBadgeProps) {
   if (status?.cloud_status === 'failed') {
     return <span className="status-chip is-alert" title={title}>云端未更新 · {syncTime}</span>;
   }
+  if (cached) {
+    return (
+      <span className="status-chip is-alert" title={title}>
+        缓存快照 · {syncTime}
+      </span>
+    );
+  }
   return (
     <span
       className={`status-chip ${stale ? 'is-alert' : ''}`}
       title={title}
     >
-      {stale ? '数据可能已过期' : `同步于 ${syncTime}`}
+      {stale
+        ? verboseSyncTime
+          ? `可能已过期 · ${syncTime}`
+          : '数据可能已过期'
+        : `${verboseSyncTime ? '最后同步于' : '同步于'} ${syncTime}`}
     </span>
   );
 }

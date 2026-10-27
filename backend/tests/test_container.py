@@ -38,6 +38,9 @@ class RecordingNotifier(FakeNotifier):
 
 
 class FakePublisher:
+    def is_configured(self):
+        return True
+
     def publish(self, payload):
         raise AssertionError("no publication expected")
 
@@ -70,7 +73,8 @@ def test_container_builds_default_dependencies(tmp_path):
         assert container.sync_service._gateway is container.gateway
         assert container.sync_service._notifier is container.notifier
         assert container.gateway._calendar_days == 7
-        assert container.publisher is None
+        assert container.publisher is not None
+        assert container.sync_service._publisher is container.publisher
         # The lifespan owns initialization; building must not touch the database.
         assert not container.db.path.exists()
     finally:

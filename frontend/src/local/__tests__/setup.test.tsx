@@ -57,6 +57,8 @@ describe('SetupWizard', () => {
     await userEvent.click(screen.getByRole('button', { name: '连接并同步' }));
     await screen.findByText('微信提醒');
     await userEvent.click(screen.getByRole('button', { name: '跳过' }));
+    expect(await screen.findByText('云端只读快照')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '跳过' }));
     await userEvent.click(screen.getByRole('button', { name: '开始使用' }));
 
     expect(onComplete).toHaveBeenCalled();
@@ -81,6 +83,45 @@ describe('SetupWizard', () => {
     await userEvent.click(screen.getByRole('button', { name: '保存并测试' }));
 
     expect(pushApi).toHaveBeenCalledWith('push-token', true);
+    expect(await screen.findByText('云端只读快照')).toBeInTheDocument();
+  });
+
+  it('saves cloud configuration and shows the pairing QR', async () => {
+    const cloudApi = vi.fn().mockResolvedValue({
+      configured: true,
+      published: true,
+      pages_url: 'https://alice.github.io/next-class/',
+      gist_id: 'gist-1',
+      qr_ready: true,
+    });
+    render(
+      <SetupWizard
+        onComplete={vi.fn()}
+        schoolApi={vi.fn().mockResolvedValue({ status: 'success' })}
+        pushApi={vi.fn()}
+        cloudApi={cloudApi}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText('学号'), '20250001');
+    await userEvent.type(screen.getByLabelText('密码'), 'pw');
+    await userEvent.click(screen.getByRole('button', { name: '连接并同步' }));
+    await screen.findByText('微信提醒');
+    await userEvent.click(screen.getByRole('button', { name: '跳过' }));
+    await screen.findByText('云端只读快照');
+    await userEvent.type(screen.getByLabelText('GitHub token'), 'ghp-token');
+    await userEvent.type(
+      screen.getByLabelText('GitHub Pages 地址'),
+      'https://alice.github.io/next-class/',
+    );
+    await userEvent.click(screen.getByRole('button', { name: '保存并发布' }));
+
+    expect(cloudApi).toHaveBeenCalledWith({
+      token: 'ghp-token',
+      pages_url: 'https://alice.github.io/next-class/',
+      gist_id: undefined,
+    });
     expect(await screen.findByText('配置完成')).toBeInTheDocument();
+    expect(screen.getByAltText('手机配对二维码')).toBeInTheDocument();
   });
 });

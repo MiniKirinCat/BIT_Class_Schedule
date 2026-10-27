@@ -5,12 +5,13 @@ from datetime import datetime
 from math import ceil
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .cloud import CloudError, normalize_pages_url
 from .config import AppConfig
 from .container import Container, build_container
 from .schedule import PERIOD_TIMES
@@ -29,6 +30,12 @@ class SchoolSetup(BaseModel):
 class PushSetup(BaseModel):
     token: str = Field(min_length=1, max_length=256)
     test: bool = False
+
+
+class CloudSetup(BaseModel):
+    token: str = Field(default="", max_length=512)
+    pages_url: str = Field(default="", max_length=512)
+    gist_id: str = Field(default="", max_length=128)
 
 
 class SettingsUpdate(BaseModel):
@@ -50,6 +57,17 @@ def _credential(container: Container, key: str) -> str | None:
         return None
 
 
+def _cloud_fields(container: Container) -> dict:
+    return {
+        "cloud_configured": container.cloud.is_configured(),
+        "cloud_pages_url": container.cloud.pages_url or None,
+        "cloud_gist_id": container.settings.get("gist_id"),
+        "cloud_last_publish_at": container.settings.get("last_cloud_publish_at"),
+        "cloud_last_error": container.settings.get("last_cloud_error"),
+        "cloud_qr_ready": container.cloud.qr_ready,
+    }
+
+
 def _status_payload(container: Container) -> dict:
     last_run = container.snapshots.latest_sync_run()
     next_due = container.sync_service.next_due_at()
@@ -60,7 +78,7 @@ def _status_payload(container: Container) -> dict:
         "school_configured": bool(username and password),
         "school_username": username,
         "push_configured": bool(_credential(container, "pushplus_token")),
-        "cloud_configured": False,
+        **_cloud_fields(container),
         "last_sync_at": container.settings.get("last_success_sync_at"),
         "last_attempt_at": container.settings.get("last_attempt_sync_at"),
         "next_due_at": next_due.isoformat(timespec="seconds"),
@@ -81,7 +99,7 @@ def _settings_payload(container: Container) -> dict:
             and _credential(container, "school_password")
         ),
         "push_configured": bool(_credential(container, "pushplus_token")),
-        "cloud_configured": False,
+        **_cloud_fields(container),
     }
 
 
@@ -251,6 +269,65 @@ def create_app(
                     detail=redact(str(exc)) or "测试提醒发送失败",
                 ) from exc
         return {"configured": True, "tested": payload.test}
+
+    @app.post("/api/setup/cloud")
+    def setup_cloud(payload: CloudSetup, request: Request) -> dict:
+        active = _container(request)
+        token = payload.token.strip()
+        if not token and not _credential(active, "github_token"):
+            raise HTTPException(status_code=422, detail="请输入 GitHub token")
+        if payload.pages_url.strip():
+            try:
+                normalize_pages_url(payload.pages_url)
+            except CloudError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        try:
+            return active.cloud.setup(
+                token=token,
+                pages_url=payload.pages_url,
+                gist_id=payload.gist_id,
+            )
+        except CloudError as exc:
+            status = 503 if "凭据管理器" in str(exc) else 502
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+    @app.get("/api/setup/qr")
+    def setup_qr(request: Request) -> Response:
+        active = _container(request)
+        try:
+            svg = active.cloud.qr_svg()
+        except CloudError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return Response(
+            content=svg,
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post("/api/cloud/publish")
+    def publish_cloud(request: Request) -> dict:
+        active = _container(request)
+        if not active.cloud.is_configured():
+            raise HTTPException(status_code=400, detail="请先完成云端快照配置")
+        if active.snapshots.latest() is None:
+            raise HTTPException(status_code=400, detail="还没有课表快照，请先同步")
+        try:
+            published_at = active.cloud.publish_current()
+        except CloudError as exc:
+            status = 503 if "凭据管理器" in str(exc) else 502
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return {"status": "success", "published_at": published_at}
+
+    @app.post("/api/cloud/reset-key")
+    def reset_cloud_key(request: Request) -> dict:
+        active = _container(request)
+        if not active.cloud.is_configured():
+            raise HTTPException(status_code=400, detail="请先完成云端快照配置")
+        try:
+            return active.cloud.reset_key()
+        except CloudError as exc:
+            status = 503 if "凭据管理器" in str(exc) else 502
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
 
     @app.post("/api/sync")
     async def sync_now(request: Request) -> dict:

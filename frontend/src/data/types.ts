@@ -6,6 +6,11 @@ export interface AppStatus {
   school_username: string | null;
   push_configured: boolean;
   cloud_configured: boolean;
+  cloud_pages_url: string | null;
+  cloud_gist_id: string | null;
+  cloud_last_publish_at: string | null;
+  cloud_last_error: string | null;
+  cloud_qr_ready: boolean;
   last_sync_at: string | null;
   last_attempt_at: string | null;
   next_due_at: string | null;
@@ -22,6 +27,19 @@ export interface AppSettings {
   school_configured: boolean;
   push_configured: boolean;
   cloud_configured: boolean;
+  cloud_pages_url: string | null;
+  cloud_gist_id: string | null;
+  cloud_last_publish_at: string | null;
+  cloud_last_error: string | null;
+  cloud_qr_ready: boolean;
+}
+
+export interface CloudSetupResult {
+  configured: boolean;
+  published: boolean;
+  pages_url: string;
+  gist_id: string;
+  qr_ready: boolean;
 }
 
 export interface SyncResult {

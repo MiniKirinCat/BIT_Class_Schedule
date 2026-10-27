@@ -26,6 +26,15 @@ export function writeStorage(key: string, value: string): void {
   }
 }
 
+export function removeStorage(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Ignore unavailable storage; the in-memory state is still cleared.
+  }
+}
+
 export function useStoredChoice<T extends string>(
   key: string,
   fallback: T,

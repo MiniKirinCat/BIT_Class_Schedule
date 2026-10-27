@@ -9,6 +9,7 @@ interface AppShellProps {
   onNavigate: (page: PageKey) => void;
   cloudMode?: boolean;
   statusChip?: ReactNode;
+  banner?: ReactNode;
   children: ReactNode;
 }
 
@@ -18,6 +19,7 @@ export function AppShell({
   onNavigate,
   cloudMode = false,
   statusChip,
+  banner,
   children,
 }: AppShellProps) {
   return (
@@ -29,6 +31,7 @@ export function AppShell({
         </div>
         {statusChip ?? <StaleBadge snapshot={snapshot} />}
       </header>
+      {banner}
       <main className="page">{children}</main>
       <BottomNav page={page} onChange={onNavigate} cloudMode={cloudMode} />
     </div>

@@ -112,6 +112,23 @@ p {
   background: var(--alert-soft);
 }
 
+.cloud-banner {
+  display: grid;
+  gap: 3px;
+  margin: 12px 18px 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--alert) 28%, transparent);
+  border-radius: 14px;
+  color: var(--alert);
+  background: var(--alert-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cloud-banner strong {
+  font-size: 13px;
+}
+
 .page {
   padding: 18px 18px 10px;
 }
@@ -1107,6 +1124,18 @@ p {
   margin-top: 14px;
 }
 
+.settings-section > .form-actions {
+  margin-top: 12px;
+}
+
+.settings-section .form-field + .form-field {
+  margin-top: 12px;
+}
+
+.setup-card > .form {
+  margin-top: 18px;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
@@ -1135,6 +1164,28 @@ p {
 
 .settings-value.is-alert {
   color: var(--alert);
+}
+
+.qr-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.qr-card .form-hint {
+  color: #5f665f;
+  text-align: center;
+}
+
+.qr-image {
+  width: min(100%, 220px);
+  height: auto;
+  image-rendering: pixelated;
 }
 
 .theme-picker {

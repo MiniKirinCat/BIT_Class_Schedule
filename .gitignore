@@ -21,6 +21,7 @@ frontend/dist-cloud/
 *.log
 .env
 .env.*
+!frontend/.env.cloud
 secrets/
 
 # Brainstorming artifacts and local tooling

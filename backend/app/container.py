@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from .cloud import CloudService, GistClient, SyncCloudPublisher
 from .config import AppConfig
 from .db import Database, SettingsRepo, SnapshotRepo
 from .notifier import PushPlusNotifier
@@ -18,6 +19,7 @@ class Container:
     credentials: CredentialStore
     gateway: BitSchoolGateway
     notifier: PushPlusNotifier
+    cloud: CloudService
     publisher: CloudPublisher | None
     sync_service: SyncService
     scheduler: SyncScheduler
@@ -35,6 +37,7 @@ def build_container(
     gateway=None,
     notifier=None,
     publisher: CloudPublisher | None = None,
+    cloud_client: GistClient | None = None,
 ) -> Container:
     db = Database(config.db_path)
     settings = SettingsRepo(db)
@@ -51,6 +54,16 @@ def build_container(
         if notifier is not None
         else PushPlusNotifier(lambda: credentials.get("pushplus_token"))
     )
+    cloud = CloudService(
+        config=config,
+        settings=settings,
+        snapshots=snapshots,
+        credentials=credentials,
+        client=cloud_client,
+    )
+    active_publisher = (
+        publisher if publisher is not None else SyncCloudPublisher(cloud)
+    )
     sync_service = SyncService(
         config=config,
         settings=settings,
@@ -58,7 +71,7 @@ def build_container(
         credentials=credentials,
         gateway=gateway,
         notifier=notifier,
-        publisher=publisher,
+        publisher=active_publisher,
     )
     scheduler = SyncScheduler(sync_service, config)
     return Container(
@@ -69,7 +82,8 @@ def build_container(
         credentials=credentials,
         gateway=gateway,
         notifier=notifier,
-        publisher=publisher,
+        cloud=cloud,
+        publisher=active_publisher,
         sync_service=sync_service,
         scheduler=scheduler,
         owns_notifier=owns_notifier,

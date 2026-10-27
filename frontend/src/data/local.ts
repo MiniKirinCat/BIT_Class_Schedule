@@ -1,4 +1,9 @@
-import type { AppSettings, AppStatus, SyncResult } from './types';
+import type {
+  AppSettings,
+  AppStatus,
+  CloudSetupResult,
+  SyncResult,
+} from './types';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -62,4 +67,16 @@ export const api = {
   sync: () => request<SyncResult>('/api/sync', { method: 'POST' }),
   testNotification: () =>
     request<{ status: string }>('/api/notifications/test', { method: 'POST' }),
+  setupCloud: (payload: { token: string; pages_url: string; gist_id?: string }) =>
+    request<CloudSetupResult>('/api/setup/cloud', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  publishCloud: () =>
+    request<{ status: string; published_at: string }>('/api/cloud/publish', {
+      method: 'POST',
+    }),
+  resetCloudKey: () =>
+    request<CloudSetupResult>('/api/cloud/reset-key', { method: 'POST' }),
+  cloudQrUrl: (version: number) => `/api/setup/qr?v=${version}`,
 };

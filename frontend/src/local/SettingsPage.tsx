@@ -3,6 +3,7 @@ import type { ThemeName } from '../types';
 import type { AppSettings, AppStatus } from '../data/types';
 import { api, messageFromError } from '../data/local';
 import { formatDateTime } from '../lib/schedule';
+import { ThemePicker } from '../shared/ThemePicker';
 
 interface SettingsPageProps {
   status: AppStatus;
@@ -10,6 +11,7 @@ interface SettingsPageProps {
   onThemeChange: (theme: ThemeName) => void;
   onRelogin: () => void;
   onSync: () => Promise<void>;
+  onRefresh: () => Promise<void>;
   syncBusy: boolean;
   syncError: string;
 }
@@ -20,11 +22,17 @@ export function SettingsPage({
   onThemeChange,
   onRelogin,
   onSync,
+  onRefresh,
   syncBusy,
   syncError,
 }: SettingsPageProps) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [token, setToken] = useState('');
+  const [cloudToken, setCloudToken] = useState('');
+  const [pagesUrl, setPagesUrl] = useState(status.cloud_pages_url ?? '');
+  const [gistId, setGistId] = useState('');
+  const [qrVersion, setQrVersion] = useState(() => Date.now());
+  const [resetArmed, setResetArmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -77,6 +85,75 @@ export function SettingsPage({
     try {
       await api.testNotification();
       setNotice('测试提醒已发送');
+    } catch (caught) {
+      setError(messageFromError(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveCloud(event: FormEvent) {
+    event.preventDefault();
+    if (!cloudToken.trim() && !status.cloud_configured) {
+      setError('请输入 GitHub token');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.setupCloud({
+        token: cloudToken.trim(),
+        pages_url: pagesUrl.trim(),
+        gist_id: gistId.trim() || undefined,
+      });
+      setCloudToken('');
+      setGistId('');
+      setQrVersion(Date.now());
+      setSettings(await api.settings());
+      await onRefresh();
+      setNotice(
+        result.published
+          ? '云端配置已保存并发布'
+          : '云端配置已保存；下次同步后会发布首个快照',
+      );
+    } catch (caught) {
+      setError(messageFromError(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publishCloud() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api.publishCloud();
+      await onRefresh();
+      setQrVersion(Date.now());
+      setNotice('云端快照已重新发布');
+    } catch (caught) {
+      setError(messageFromError(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetCloudKey() {
+    if (!resetArmed) {
+      setResetArmed(true);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api.resetCloudKey();
+      setResetArmed(false);
+      await onRefresh();
+      setQrVersion(Date.now());
+      setNotice('配对密钥已重置，旧二维码已失效');
     } catch (caught) {
       setError(messageFromError(caught));
     } finally {
@@ -232,38 +309,117 @@ export function SettingsPage({
       </section>
 
       <section className="settings-section">
-        <h3>主题</h3>
-        <div className="theme-picker">
-          <button
-            type="button"
-            className={`theme-choice ${theme === 'warm' ? 'is-active' : ''}`}
-            data-theme-choice="warm"
-            aria-pressed={theme === 'warm'}
-            onClick={() => onThemeChange('warm')}
-          >
-            <span className="theme-swatch" aria-hidden="true">
-              <span className="swatch-bg" />
-              <span className="swatch-primary" />
-              <span className="swatch-hero" />
-            </span>
-            暖纸
-          </button>
-          <button
-            type="button"
-            className={`theme-choice ${theme === 'fog' ? 'is-active' : ''}`}
-            data-theme-choice="fog"
-            aria-pressed={theme === 'fog'}
-            onClick={() => onThemeChange('fog')}
-          >
-            <span className="theme-swatch" aria-hidden="true">
-              <span className="swatch-bg" />
-              <span className="swatch-primary" />
-              <span className="swatch-hero" />
-            </span>
-            雾蓝
-          </button>
+        <h3>云端快照</h3>
+        <div className="settings-row">
+          <span>发布状态</span>
+          <span className={`settings-value ${status.cloud_configured ? 'is-ok' : 'is-alert'}`}>
+            {status.cloud_configured ? '已配置' : '未配置'}
+          </span>
         </div>
-        <p className="form-hint">深色模式始终跟随系统，不提供手动深浅开关。</p>
+        {status.cloud_gist_id && (
+          <div className="settings-row">
+            <span>Gist</span>
+            <span className="settings-value">{status.cloud_gist_id}</span>
+          </div>
+        )}
+        <div className="settings-row">
+          <span>Pages 地址</span>
+          <span className="settings-value">{status.cloud_pages_url ?? '—'}</span>
+        </div>
+        <div className="settings-row">
+          <span>上次发布</span>
+          <span className="settings-value">
+            {status.cloud_last_publish_at
+              ? formatDateTime(status.cloud_last_publish_at)
+              : '—'}
+          </span>
+        </div>
+        {status.cloud_last_error && (
+          <p className="form-error">{status.cloud_last_error}</p>
+        )}
+        <form className="form" onSubmit={saveCloud}>
+          <label className="form-field">
+            <span className="form-label">GitHub token</span>
+            <input
+              className="input"
+              type="password"
+              value={cloudToken}
+              onChange={(event) => setCloudToken(event.target.value)}
+              autoComplete="off"
+              placeholder={
+                status.cloud_configured
+                  ? '已配置，留空表示沿用'
+                  : 'classic token，勾选 gist 权限'
+              }
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-label">GitHub Pages 地址</span>
+            <input
+              className="input"
+              value={pagesUrl}
+              onChange={(event) => setPagesUrl(event.target.value)}
+              autoComplete="url"
+              placeholder="https://<用户名>.github.io/<仓库名>/"
+            />
+          </label>
+          <label className="form-field">
+            <span className="form-label">已有 Gist ID（可选）</span>
+            <input
+              className="input"
+              value={gistId}
+              onChange={(event) => setGistId(event.target.value)}
+              autoComplete="off"
+              placeholder="留空会自动创建 secret Gist"
+            />
+          </label>
+          <div className="form-actions">
+            <button type="submit" className="button button-primary" disabled={busy}>
+              保存并发布
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={busy || !status.cloud_configured}
+              onClick={() => void publishCloud()}
+            >
+              立即重新发布
+            </button>
+            <button
+              type="button"
+              className={`button ${resetArmed ? 'button-danger' : ''}`}
+              disabled={busy || !status.cloud_configured}
+              onClick={() => void resetCloudKey()}
+            >
+              {resetArmed ? '再次点击确认重置' : '重置配对密钥'}
+            </button>
+          </div>
+          <p className="form-hint">
+            token 只保存在 Windows 凭据管理器；Gist 中只有 AES-256-GCM
+            密文。重置密钥后，手机需要重新扫码。
+          </p>
+        </form>
+        {status.cloud_qr_ready ? (
+          <div className="qr-card">
+            <img
+              className="qr-image"
+              src={api.cloudQrUrl(qrVersion)}
+              alt="手机配对二维码"
+            />
+            <p className="form-hint">
+              手机扫码导入快照地址和密钥，之后可直接添加到主屏幕。
+            </p>
+          </div>
+        ) : (
+          <p className="form-hint">
+            完成配置并至少发布一次后，这里会显示手机配对二维码。
+          </p>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <h3>主题</h3>
+        <ThemePicker theme={theme} onChange={onThemeChange} />
       </section>
 
       <section className="settings-section">
@@ -277,7 +433,8 @@ export function SettingsPage({
           <span className="settings-value">课表在 data 目录；密码与 token 在 Windows 凭据管理器</span>
         </div>
         <p className="form-hint">
-          应用只监听 127.0.0.1。云端只读快照不是本地核心的一部分，将在后续阶段加入。
+          应用只监听 127.0.0.1。云端只读页面由 GitHub Pages 提供，不包含教务账号或
+          GitHub token。
         </p>
       </section>
     </section>

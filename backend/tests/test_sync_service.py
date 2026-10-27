@@ -89,6 +89,9 @@ class FakePublisher:
         self.payloads = []
         self.fail_times = 0
 
+    def is_configured(self):
+        return True
+
     def publish(self, payload):
         if self.fail_times > 0:
             self.fail_times -= 1

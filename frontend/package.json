@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:local": "tsc --noEmit && vite build --outDir dist-local",
+    "build:local": "tsc --noEmit && vite build",
+    "build:cloud": "tsc --noEmit && vite build --mode cloud",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "npm run build:local && npm run build:cloud && playwright test"
   },
   "dependencies": {
     "react": "^19.1.0",

@@ -129,6 +129,11 @@ def status():
         "school_username": "20250001",
         "push_configured": False,
         "cloud_configured": False,
+        "cloud_pages_url": None,
+        "cloud_gist_id": None,
+        "cloud_last_publish_at": None,
+        "cloud_last_error": None,
+        "cloud_qr_ready": False,
         "last_sync_at": snapshot["synced_at"],
         "last_attempt_at": snapshot["last_attempt_at"],
         "next_due_at": snapshot["next_due_at"],
@@ -148,6 +153,11 @@ def settings():
         "school_configured": True,
         "push_configured": False,
         "cloud_configured": False,
+        "cloud_pages_url": None,
+        "cloud_gist_id": None,
+        "cloud_last_publish_at": None,
+        "cloud_last_error": None,
+        "cloud_qr_ready": False,
     }
 
 

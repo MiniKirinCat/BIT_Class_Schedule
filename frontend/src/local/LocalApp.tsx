@@ -153,6 +153,9 @@ export function LocalApp() {
           setShowSetup(false);
         }}
         onCancel={status.configured ? () => setShowSetup(false) : undefined}
+        cloudConfigured={status.cloud_configured}
+        cloudQrReady={status.cloud_qr_ready}
+        cloudPagesUrl={status.cloud_pages_url}
       />
     );
   }
@@ -169,6 +172,7 @@ export function LocalApp() {
         onThemeChange={setTheme}
         onRelogin={() => setShowSetup(true)}
         onSync={handleSync}
+        onRefresh={refresh}
         syncBusy={syncBusy}
         syncError={syncError}
       />
