@@ -57,6 +57,8 @@ scripts\stop.ps1
 
 ### 一次性部署
 
+当前仓库已完成仓库创建、Pages 启用和首次部署，站点 <https://minikirincat.github.io/BIT_Class_Schedule/> 已上线；可以直接从第 5 步（创建 gist token）继续。下面是完整重建步骤。
+
 1. 仓库已创建并推送：<https://github.com/MiniKirinCat/BIT_Class_Schedule>（public，`master`）。
 2. 打开仓库 **Settings → Pages**，把 **Build and deployment → Source** 设为 **GitHub Actions**。GitHub 不允许 Actions 自带的 token 创建 Pages，所以这一次必须手动；之后部署全自动。
 3. 到 **Actions → Deploy cloud PWA** 点击 **Re-run all jobs**（或 **Run workflow**）。工作流会执行 `npm run build:cloud` 并把 `frontend/dist-cloud` 发布到 Pages。

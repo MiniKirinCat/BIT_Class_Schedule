@@ -2,7 +2,7 @@
 
 本文是「下一节」云端只读快照的手动部署与验收步骤。完成后，电脑关机时手机仍可通过 GitHub Pages 打开只读课表；电脑端只负责同步和发布加密快照。
 
-> 仓库已创建并推送：<https://github.com/MiniKirinCat/BIT_Class_Schedule>。目标 Pages 地址是 <https://minikirincat.github.io/BIT_Class_Schedule/>，在手动开启 Pages 并完成首次部署后生效。不要把 token、二维码或解密密钥发到聊天、issue 或公开仓库里。
+> 仓库已创建并推送：<https://github.com/MiniKirinCat/BIT_Class_Schedule>。Pages 已启用并完成首次部署，站点 <https://minikirincat.github.io/BIT_Class_Schedule/> 已可访问。第 1–4 节保留为重建和排错参考；当前可直接从第 5 节开始。不要把 token、二维码或解密密钥发到聊天、issue 或公开仓库里。
 
 ## 0. 先理解三类凭据
 
@@ -71,6 +71,8 @@ git remote set-url origin https://github.com/MiniKirinCat/BIT_Class_Schedule.git
 > 如果 Git 要求输入密码，请使用有仓库写权限的 GitHub PAT（不是只勾选 `gist` 的云端 token），或使用 Git Credential Manager / `gh auth login` 的浏览器登录。
 
 ## 4. 启用 GitHub Pages（必须手动一次）
+
+> 当前仓库已完成本节：Pages 的 Source 是 **GitHub Actions**，首次部署成功。以下步骤用于重建仓库或排错。
 
 GitHub 不允许 Actions 自带的 `GITHUB_TOKEN` 创建 Pages 站点。工作流尝试自动启用时会失败：
 
