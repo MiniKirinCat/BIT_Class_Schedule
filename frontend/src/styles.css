@@ -1235,3 +1235,26 @@ p {
     transition-duration: 0.01ms !important;
   }
 }
+
+.hero-card {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  font: inherit;
+}
+
+.course-name,
+.course-meta {
+  display: block;
+}
+
+.stat-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-content strong {
+  display: block;
+  font-size: 14px;
+}
