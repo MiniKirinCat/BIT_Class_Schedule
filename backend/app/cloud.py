@@ -12,7 +12,7 @@ import qrcode
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from .config import AppConfig
-from .db import SettingsRepo, SnapshotRepo
+from .db import SettingsRepo, SnapshotRecord, SnapshotRepo
 from .schedule import PERIOD_TIMES
 from .security import CredentialError, safe_message
 
@@ -102,27 +102,33 @@ def changes_payload(rows: list[dict]) -> list[dict]:
     return result
 
 
-def build_cloud_payload(
+def build_archive_payload(
     *,
     app_version: str,
     synced_at: str,
     sync_interval_days: int,
-    term: str,
-    first_day: str,
-    sessions,
-    changes: list[dict],
-    calendar,
+    current_term: str,
+    records: list[SnapshotRecord],
+    changes_by_term: dict[str, list[dict]],
 ) -> dict:
+    ordered = sorted(records, key=lambda record: record.term != current_term)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "app_version": app_version,
         "synced_at": synced_at,
         "sync_interval_days": sync_interval_days,
-        "term": term,
-        "first_day": first_day,
-        "courses": [session.to_dict() for session in sessions],
-        "changes": changes,
-        "calendar": [entry.to_dict() for entry in calendar],
+        "current_term": current_term,
+        "terms": [
+            {
+                "term": record.term,
+                "first_day": record.first_day,
+                "fetched_at": record.fetched_at,
+                "courses": [session.to_dict() for session in record.sessions],
+                "changes": changes_by_term.get(record.term, []),
+                "calendar": [entry.to_dict() for entry in record.calendar],
+            }
+            for record in ordered
+        ],
         "period_times": [
             {"index": period.index, "start": period.start, "end": period.end}
             for period in PERIOD_TIMES
@@ -408,17 +414,19 @@ class CloudService:
         snapshot = self._snapshots.latest()
         if snapshot is None:
             raise CloudError("还没有课表快照，请先完成同步")
-        return build_cloud_payload(
+        records = self._snapshots.latest_per_term()
+        return build_archive_payload(
             app_version=self._config.app_version,
             synced_at=snapshot.fetched_at,
             sync_interval_days=self._settings.get_int("sync_interval_days", 1),
-            term=snapshot.term,
-            first_day=snapshot.first_day,
-            sessions=snapshot.sessions,
-            changes=changes_payload(
-                self._snapshots.changes_for_term(snapshot.term, limit=50)
-            ),
-            calendar=snapshot.calendar,
+            current_term=snapshot.term,
+            records=records,
+            changes_by_term={
+                record.term: changes_payload(
+                    self._snapshots.changes_for_term(record.term, limit=50)
+                )
+                for record in records
+            },
         )
 
     def publish_payload(self, payload: dict, *, key: str | None = None) -> str:

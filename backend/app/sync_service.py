@@ -14,7 +14,7 @@ from .change_detector import (
     empty_confirmed_event,
     format_change_message,
 )
-from .cloud import build_cloud_payload, changes_payload
+from .cloud import build_archive_payload, changes_payload
 from .config import AppConfig
 from .db import SettingsRepo, SnapshotRepo
 from .models import ChangeEvent, CourseSession, FetchedSchedule, SyncResult
@@ -315,7 +315,7 @@ class SyncService:
         self._settings.set_int("empty_streak", 0)
 
         self._notify_changes(changes, sessions, fetched.term, snapshot_id, finished)
-        cloud_status = self._publish(fetched, sessions, finished)
+        cloud_status = self._publish(fetched.term, finished)
 
         self._snapshots.finish_sync_run(
             run_id,
@@ -381,12 +381,7 @@ class SyncService:
         self._settings.set("last_notification_error", "")
         return True
 
-    def _publish(
-        self,
-        fetched: FetchedSchedule,
-        sessions: list[CourseSession],
-        finished: str,
-    ) -> str:
+    def _publish(self, current_term: str, finished: str) -> str:
         if self._publisher is None:
             return "skipped"
         try:
@@ -399,17 +394,19 @@ class SyncService:
         if not configured:
             return "skipped"
 
-        payload = build_cloud_payload(
+        records = self._snapshots.latest_per_term()
+        payload = build_archive_payload(
             app_version=self._config.app_version,
             synced_at=finished,
             sync_interval_days=self._settings.get_int("sync_interval_days", 1),
-            term=fetched.term,
-            first_day=fetched.first_day.isoformat(),
-            sessions=sessions,
-            changes=changes_payload(
-                self._snapshots.changes_for_term(fetched.term, limit=50)
-            ),
-            calendar=fetched.calendar,
+            current_term=current_term,
+            records=records,
+            changes_by_term={
+                record.term: changes_payload(
+                    self._snapshots.changes_for_term(record.term, limit=50)
+                )
+                for record in records
+            },
         )
 
         try:

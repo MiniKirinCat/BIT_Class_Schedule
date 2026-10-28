@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { CourseSession, ScheduleSnapshot, TodayLayout, WeekLayout } from '../types';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type {
+  CourseSession,
+  ScheduleArchive,
+  TodayLayout,
+  WeekLayout,
+} from '../types';
 import type { AppStatus } from '../data/types';
 import { api, messageFromError } from '../data/local';
+import {
+  currentSnapshot,
+  isArchivedTerm,
+  snapshotForTerm,
+} from '../lib/archive';
 import {
   dateKeyInShanghai,
   unreadChangeCount,
@@ -23,22 +33,27 @@ import { WeekPage } from '../shared/week/WeekPage';
 import { ChangesPage } from '../shared/changes/ChangesPage';
 import { CourseDetailSheet } from '../shared/today/CourseDetailSheet';
 import { LayoutSheet } from '../shared/today/LayoutSheet';
+import { TermSheet } from '../shared/TermSheet';
+import { TermOverview } from '../shared/history/TermOverview';
 import { SetupWizard } from './SetupWizard';
 import { SettingsPage } from './SettingsPage';
 
 export function LocalApp() {
   const [status, setStatus] = useState<AppStatus | null>(null);
-  const [snapshot, setSnapshot] = useState<ScheduleSnapshot | null>(null);
+  const [archive, setArchive] = useState<ScheduleArchive | null>(null);
+  const [selectedTerm, setSelectedTerm] = useState('');
   const [page, setPage] = useState<PageKey>('today');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showSetup, setShowSetup] = useState(false);
   const [course, setCourse] = useState<CourseSession | null>(null);
   const [layoutSheet, setLayoutSheet] = useState(false);
+  const [termSheet, setTermSheet] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncError, setSyncError] = useState('');
   const [lastSeenId, setLastSeenId] = useState(readLastSeenChangeId);
+  const currentTermRef = useRef('');
 
   const [todayLayout, setTodayLayout] = useStoredChoice<TodayLayout>(
     STORAGE_KEYS.todayLayout,
@@ -60,9 +75,27 @@ export function LocalApp() {
       const nextStatus = await api.status();
       setStatus(nextStatus);
       if (nextStatus.configured) {
-        setSnapshot(await api.dashboard());
+        const nextArchive = await api.dashboard();
+        setArchive(nextArchive);
+        setSelectedTerm((previous) => {
+          if (
+            !previous ||
+            !nextArchive.terms.some((term) => term.term === previous)
+          ) {
+            return nextArchive.current_term;
+          }
+          if (
+            previous === currentTermRef.current &&
+            nextArchive.current_term !== previous
+          ) {
+            return nextArchive.current_term;
+          }
+          return previous;
+        });
+        currentTermRef.current = nextArchive.current_term;
       } else {
-        setSnapshot(null);
+        setArchive(null);
+        setSelectedTerm('');
       }
     } catch (caught) {
       setLoadError(messageFromError(caught));
@@ -163,7 +196,14 @@ export function LocalApp() {
     );
   }
 
-  const unread = snapshot ? unreadChangeCount(snapshot.changes, lastSeenId) : 0;
+  const current = archive ? currentSnapshot(archive) : null;
+  const snapshot = archive
+    ? snapshotForTerm(archive, selectedTerm || archive.current_term)
+    : null;
+  const archived = Boolean(
+    archive && snapshot && isArchivedTerm(archive, snapshot.term),
+  );
+  const unread = current ? unreadChangeCount(current.changes, lastSeenId) : 0;
   const today = dateKeyInShanghai(now);
 
   let content: ReactNode = null;
@@ -199,9 +239,11 @@ export function LocalApp() {
   } else if (page === 'week') {
     content = (
       <WeekPage
+        key={snapshot.term}
         snapshot={snapshot}
         layout={weekLayout}
         today={today}
+        weekAnchor={archived ? null : undefined}
         onLayoutChange={setWeekLayout}
         onOpenCourse={setCourse}
       />
@@ -212,6 +254,17 @@ export function LocalApp() {
         changes={snapshot.changes}
         lastSeenId={lastSeenId}
         onSeen={markSeen}
+        term={snapshot.term}
+        archived={archived}
+      />
+    );
+  } else if (archived) {
+    content = (
+      <TermOverview
+        snapshot={snapshot}
+        onOpenCourse={setCourse}
+        onGoWeek={() => setPage('week')}
+        onOpenChanges={() => setPage('changes')}
       />
     );
   } else {
@@ -232,10 +285,13 @@ export function LocalApp() {
   return (
     <>
       <AppShell
-        snapshot={snapshot}
+        snapshot={current}
         page={page}
         onNavigate={setPage}
-        statusChip={<StaleBadge snapshot={snapshot} status={status} />}
+        term={snapshot?.term}
+        currentTerm={archive?.current_term}
+        onChooseTerm={() => setTermSheet(true)}
+        statusChip={<StaleBadge snapshot={current} status={status} />}
       >
         {loadError && <p className="form-error">{loadError}</p>}
         {page !== 'settings' &&
@@ -263,6 +319,18 @@ export function LocalApp() {
             setLayoutSheet(false);
           }}
           onClose={() => setLayoutSheet(false)}
+        />
+      )}
+      {termSheet && archive && (
+        <TermSheet
+          archive={archive}
+          selectedTerm={snapshot?.term ?? archive.current_term}
+          onSelect={(term) => {
+            setSelectedTerm(term);
+            setCourse(null);
+            setTermSheet(false);
+          }}
+          onClose={() => setTermSheet(false)}
         />
       )}
     </>

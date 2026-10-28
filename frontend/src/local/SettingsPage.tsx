@@ -579,8 +579,8 @@ export function SettingsPage({
             </button>
           </div>
           <p className="form-hint">
-            token 只保存在 Windows 凭据管理器；Gist 中只有 AES-256-GCM
-            密文。重置密钥后，手机需要重新扫码。
+            token 只保存在 Windows 凭据管理器；Gist 中只有包含全部学期的
+            AES-256-GCM 密文。重置密钥后，手机需要重新扫码。
           </p>
         </form>
         {status.cloud_qr_ready ? (
@@ -591,7 +591,7 @@ export function SettingsPage({
               alt="手机配对二维码"
             />
             <p className="form-hint">
-              手机扫码导入快照地址和密钥，之后可直接添加到主屏幕。
+              手机扫码后可查看当前与历史学期；首次加载后添加到主屏幕，之后断网也能打开。
             </p>
           </div>
         ) : (

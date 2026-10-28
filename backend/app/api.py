@@ -11,11 +11,10 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .cloud import CloudError, normalize_pages_url
+from .cloud import CloudError, build_archive_payload, normalize_pages_url
 from .config import PROJECT_ROOT, AppConfig
 from .container import Container, build_container
 from .diagnostics import build_report, run_preflight, sync_run_payload
-from .schedule import PERIOD_TIMES
 from .security import CredentialError, redact, safe_message
 from .startup import (
     StartupError,
@@ -140,30 +139,34 @@ def _dashboard_payload(container: Container) -> dict:
 
     last_run = container.snapshots.latest_sync_run()
     next_due = container.sync_service.next_due_at()
-    return {
-        "schema_version": 1,
-        "app_version": container.config.app_version,
-        "synced_at": snapshot.fetched_at,
-        "sync_interval_days": container.settings.get_int("sync_interval_days", 1),
-        "term": snapshot.term,
-        "first_day": snapshot.first_day,
-        "courses": [session.to_dict() for session in snapshot.sessions],
-        "changes": [
-            _change_payload(row)
-            for row in container.snapshots.changes_for_term(snapshot.term, limit=50)
-        ],
-        "calendar": [entry.to_dict() for entry in snapshot.calendar],
-        "period_times": [
-            {"index": period.index, "start": period.start, "end": period.end}
-            for period in PERIOD_TIMES
-        ],
-        "sync_status": last_run["status"] if last_run else None,
-        "last_attempt_at": container.settings.get("last_attempt_sync_at"),
-        "next_due_at": next_due.isoformat(timespec="seconds"),
-        "cloud_status": last_run["cloud_publish_status"] if last_run else "skipped",
-        "last_error": container.settings.get("last_sync_error"),
-        "configured": container.sync_service.is_configured(),
-    }
+    records = container.snapshots.latest_per_term()
+    payload = build_archive_payload(
+        app_version=container.config.app_version,
+        synced_at=snapshot.fetched_at,
+        sync_interval_days=container.settings.get_int("sync_interval_days", 1),
+        current_term=snapshot.term,
+        records=records,
+        changes_by_term={
+            record.term: [
+                _change_payload(row)
+                for row in container.snapshots.changes_for_term(
+                    record.term, limit=50
+                )
+            ]
+            for record in records
+        },
+    )
+    payload.update(
+        {
+            "sync_status": last_run["status"] if last_run else None,
+            "last_attempt_at": container.settings.get("last_attempt_sync_at"),
+            "next_due_at": next_due.isoformat(timespec="seconds"),
+            "cloud_status": last_run["cloud_publish_status"] if last_run else "skipped",
+            "last_error": container.settings.get("last_sync_error"),
+            "configured": container.sync_service.is_configured(),
+        }
+    )
+    return payload
 
 
 def _sync_result(result) -> dict:

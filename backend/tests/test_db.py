@@ -97,6 +97,42 @@ def test_snapshot_and_changes_roundtrip(tmp_path):
     assert run["change_count"] == 1
 
 
+def test_latest_per_term_keeps_one_snapshot_for_each_term(tmp_path):
+    repo = SnapshotRepo(make_db(tmp_path))
+
+    def save(term: str, first_day: str, fetched_at: str, room: str) -> None:
+        sync_id = repo.record_sync_run(
+            trigger="manual",
+            started_at=fetched_at,
+            finished_at=fetched_at,
+            status="success",
+            term=term,
+        )
+        repo.save_snapshot(
+            sync_run_id=sync_id,
+            term=term,
+            fetched_at=fetched_at,
+            first_day=first_day,
+            sessions=[session(room)],
+            calendar=[],
+            payload_hash=f"{term}-{room}",
+            is_baseline=True,
+        )
+
+    save("2025-2026-1", "2025-09-01", "2026-01-10T12:00:00+08:00", "A101")
+    save("2026-2027-1", "2026-09-07", "2026-10-25T12:00:00+08:00", "B202")
+    save("2026-2027-1", "2026-09-07", "2026-10-26T12:00:00+08:00", "C303")
+
+    records = repo.latest_per_term()
+
+    assert [record.term for record in records] == [
+        "2026-2027-1",
+        "2025-2026-1",
+    ]
+    assert records[0].sessions[0].room == "C303"
+    assert records[1].sessions[0].room == "A101"
+
+
 def test_failed_sync_run_defaults_cloud_status_to_skipped(tmp_path):
     repo = SnapshotRepo(make_db(tmp_path))
     sync_id = repo.record_sync_run(

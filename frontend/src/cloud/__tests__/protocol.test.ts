@@ -1,6 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ScheduleSnapshot } from '../../types';
+import type { ScheduleArchive, ScheduleSnapshot } from '../../types';
 import {
   CloudLoadError,
   buildCloudConfig,
@@ -10,7 +10,7 @@ import {
   maskSnapshotUrl,
   parseCloudHash,
   saveCloudCache,
-  validateSnapshot,
+  validateArchive,
 } from '../protocol';
 
 vi.stubGlobal('crypto', webcrypto);
@@ -41,6 +41,25 @@ const SNAPSHOT: ScheduleSnapshot = {
   ],
   changes: [],
   calendar: [{ date: '2026-10-27', week: 8, weekday: 2 }],
+  period_times: [{ index: 1, start: '08:00', end: '08:45' }],
+};
+
+const ARCHIVE: ScheduleArchive = {
+  schema_version: 2,
+  app_version: '1.2.0',
+  synced_at: '2026-10-27T12:00:00+08:00',
+  sync_interval_days: 1,
+  current_term: '2026-2027-1',
+  terms: [
+    {
+      term: '2026-2027-1',
+      first_day: '2026-09-07',
+      fetched_at: '2026-10-27T12:00:00+08:00',
+      courses: SNAPSHOT.courses,
+      changes: [],
+      calendar: [{ date: '2026-10-27', week: 8, weekday: 2 }],
+    },
+  ],
   period_times: [{ index: 1, start: '08:00', end: '08:45' }],
 };
 
@@ -131,13 +150,21 @@ describe('cloud pairing config', () => {
 
 describe('cloud snapshot decryption', () => {
   it('decrypts a valid AES-GCM envelope', async () => {
-    const envelope = await encrypt(SNAPSHOT);
+    const envelope = await encrypt(ARCHIVE);
     const payload = await decryptSnapshotEnvelope(envelope, KEY);
-    expect(validateSnapshot(payload)).toEqual(SNAPSHOT);
+    expect(validateArchive(payload)).toEqual(ARCHIVE);
+  });
+
+  it('wraps a legacy version 1 snapshot as a single-term archive', () => {
+    const archive = validateArchive(SNAPSHOT);
+    expect(archive.current_term).toBe('2026-2027-1');
+    expect(archive.terms).toHaveLength(1);
+    expect(archive.terms[0].fetched_at).toBe(SNAPSHOT.synced_at);
+    expect(archive.terms[0].courses).toEqual(SNAPSHOT.courses);
   });
 
   it('reports a wrong key as a decrypt error', async () => {
-    const envelope = await encrypt(SNAPSHOT);
+    const envelope = await encrypt(ARCHIVE);
     const wrongKey = b64url(new Uint8Array(32).fill(9));
     await expect(decryptSnapshotEnvelope(envelope, wrongKey)).rejects.toMatchObject({
       kind: 'decrypt',
@@ -148,16 +175,22 @@ describe('cloud snapshot decryption', () => {
     await expect(
       decryptSnapshotEnvelope({ format: 'wrong' }, KEY),
     ).rejects.toBeInstanceOf(CloudLoadError);
-    expect(() => validateSnapshot({ schema_version: 2 })).toThrow(CloudLoadError);
+    expect(() => validateArchive({ schema_version: 2 })).toThrow(CloudLoadError);
     expect(() =>
-      validateSnapshot({ ...SNAPSHOT, courses: [{ course_name: 'x' }] }),
+      validateArchive({
+        ...ARCHIVE,
+        terms: [{ ...ARCHIVE.terms[0], courses: [{ course_name: 'x' }] }],
+      }),
+    ).toThrow(CloudLoadError);
+    expect(() =>
+      validateArchive({ ...ARCHIVE, current_term: 'missing' }),
     ).toThrow(CloudLoadError);
   });
 });
 
 describe('cloud snapshot loading', () => {
   it('fetches, decrypts and caches the raw Gist URL', async () => {
-    const envelope = await encrypt(SNAPSHOT);
+    const envelope = await encrypt(ARCHIVE);
     const fetcher = vi.fn().mockResolvedValue(response(envelope));
     const config = {
       snapshotUrl:
@@ -171,7 +204,7 @@ describe('cloud snapshot loading', () => {
     });
 
     expect(result.source).toBe('network');
-    expect(result.snapshot.term).toBe('2026-2027-1');
+    expect(result.archive.current_term).toBe('2026-2027-1');
     expect(fetcher).toHaveBeenCalledWith(config.snapshotUrl, {
       cache: 'no-store',
     });
@@ -181,12 +214,12 @@ describe('cloud snapshot loading', () => {
       fetcher: offline as unknown as typeof fetch,
     });
     expect(cached.source).toBe('cache');
-    expect(cached.snapshot.courses[0].course_name).toBe('高等数学');
+    expect(cached.archive.terms[0].courses[0].course_name).toBe('高等数学');
     expect(cached.warning).toContain('无法获取云端快照');
   });
 
   it('falls back to the Gist API when the raw URL fails', async () => {
-    const envelope = await encrypt(SNAPSHOT);
+    const envelope = await encrypt(ARCHIVE);
     const fetcher = vi
       .fn()
       .mockRejectedValueOnce(new Error('cors'))
@@ -215,8 +248,8 @@ describe('cloud snapshot loading', () => {
   });
 
   it('does not use a cached snapshot when decryption fails', async () => {
-    saveCloudCache(SNAPSHOT);
-    const envelope = await encrypt(SNAPSHOT);
+    saveCloudCache(ARCHIVE);
+    const envelope = await encrypt(ARCHIVE);
     const fetcher = vi.fn().mockResolvedValue(response(envelope));
     const wrongKey = b64url(new Uint8Array(32).fill(9));
 

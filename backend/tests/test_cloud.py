@@ -122,12 +122,17 @@ def make_service(tmp_path, state, credentials=None):
     return service, settings, snapshots, credentials or service._credentials
 
 
-def save_snapshot(snapshots):
+def save_snapshot(
+    snapshots,
+    *,
+    term: str = "2026-2027-1",
+    fetched_at: str | None = None,
+):
     snapshots.save_snapshot(
         sync_run_id=1,
-        term="2026-2027-1",
-        fetched_at=NOW.isoformat(timespec="seconds"),
-        first_day="2026-09-07",
+        term=term,
+        fetched_at=fetched_at or NOW.isoformat(timespec="seconds"),
+        first_day="2026-09-07" if term == "2026-2027-1" else "2026-02-23",
         sessions=[
             CourseSession(
                 course_code="MATH101",
@@ -255,10 +260,14 @@ def test_cloud_setup_publishes_encrypted_snapshot_and_qr(tmp_path):
     patch = [item for item in state.requests if item["method"] == "PATCH"][-1]
     envelope = json.loads(patch["body"]["files"][FILENAME]["content"])
     payload = decrypt_envelope(envelope, credentials.get("snapshot_key"))
-    assert payload["term"] == "2026-2027-1"
+    assert payload["schema_version"] == 2
+    assert payload["current_term"] == "2026-2027-1"
     assert payload["sync_interval_days"] == 2
-    assert payload["courses"][0]["course_name"] == "高等数学"
-    assert payload["calendar"] == [
+    assert len(payload["terms"]) == 1
+    term = payload["terms"][0]
+    assert term["term"] == "2026-2027-1"
+    assert term["courses"][0]["course_name"] == "高等数学"
+    assert term["calendar"] == [
         {"date": "2026-10-27", "week": 8, "weekday": 2}
     ]
 
@@ -266,6 +275,31 @@ def test_cloud_setup_publishes_encrypted_snapshot_and_qr(tmp_path):
     assert svg.startswith("<svg")
     assert 'fill="#FFFFFF"' in svg
     assert credentials.get("snapshot_key") not in svg
+
+
+def test_cloud_payload_packs_current_and_archived_terms(tmp_path):
+    state = GistState()
+    service, _, snapshots, credentials = make_service(tmp_path, state)
+    save_snapshot(
+        snapshots,
+        term="2025-2026-2",
+        fetched_at="2026-07-01T12:00:00+08:00",
+    )
+    save_snapshot(snapshots)
+    service.setup(
+        token="ghp-test-token",
+        pages_url="https://alice.github.io/next-class",
+    )
+
+    payload = decrypt_envelope(json.loads(state.content), credentials.get("snapshot_key"))
+
+    assert payload["schema_version"] == 2
+    assert payload["current_term"] == "2026-2027-1"
+    assert [term["term"] for term in payload["terms"]] == [
+        "2026-2027-1",
+        "2025-2026-2",
+    ]
+    assert payload["terms"][1]["courses"][0]["course_name"] == "高等数学"
 
 
 def test_cloud_setup_rejects_invalid_gist_id(tmp_path):
@@ -314,7 +348,7 @@ def test_cloud_reset_key_republishes_with_new_key(tmp_path):
     assert result["qr_ready"] is True
     assert new_key and new_key != old_key
     envelope = json.loads(state.content)
-    assert decrypt_envelope(envelope, new_key)["term"] == "2026-2027-1"
+    assert decrypt_envelope(envelope, new_key)["current_term"] == "2026-2027-1"
     with pytest.raises(InvalidTag):
         decrypt_envelope(envelope, old_key)
 

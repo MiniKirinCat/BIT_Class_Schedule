@@ -48,7 +48,6 @@ def fixture_snapshot():
     now = datetime.now(TZ)
     today = now.date()
     first_day = today - timedelta(days=today.weekday() + 7 * 8)
-    week = 9
     today_weekday = today.weekday() + 1
     calendar = []
     for offset in range(14):
@@ -61,13 +60,13 @@ def fixture_snapshot():
             }
         )
 
-    courses = [
+    current_courses = [
         session("TODAY101", "今日测试课", today_weekday, 1, 2, "A101"),
         session("MATH101", "高等数学", 1, 3, 4, "综教 A101"),
         session("PHY101", "大学物理", 3, 5, 6, "理教 B202"),
         session("CS101", "程序设计基础", 5, 7, 8, "实验楼 201"),
     ]
-    changes = [
+    current_changes = [
         {
             "id": 2,
             "detected_at": now.isoformat(timespec="seconds"),
@@ -89,16 +88,64 @@ def fixture_snapshot():
             "after": None,
         },
     ]
+    history_courses = [
+        session(
+            "HIST101",
+            "历史测试课",
+            2,
+            3,
+            4,
+            "文科楼 101",
+            weeks=tuple(range(1, 17)),
+        ),
+        session(
+            "ENG201",
+            "学术英语",
+            4,
+            7,
+            8,
+            "外语楼 302",
+            weeks=tuple(range(1, 17)),
+        ),
+    ]
+    history_changes = [
+        {
+            "id": 3,
+            "detected_at": (now - timedelta(days=140)).isoformat(timespec="seconds"),
+            "type": "added",
+            "course_code": "HIST101",
+            "course_name": "历史测试课",
+            "summary": "新增：周二 3-4 节 历史测试课 · 文科楼 101",
+            "before": None,
+            "after": None,
+        }
+    ]
     return {
-        "schema_version": 1,
-        "app_version": "1.1.0",
+        "schema_version": 2,
+        "app_version": "1.2.0",
         "synced_at": now.isoformat(timespec="seconds"),
         "sync_interval_days": 1,
-        "term": "2026-2027-1",
-        "first_day": first_day.isoformat(),
-        "courses": courses,
-        "changes": changes,
-        "calendar": calendar,
+        "current_term": "2026-2027-1",
+        "terms": [
+            {
+                "term": "2026-2027-1",
+                "first_day": first_day.isoformat(),
+                "fetched_at": now.isoformat(timespec="seconds"),
+                "courses": current_courses,
+                "changes": current_changes,
+                "calendar": calendar,
+            },
+            {
+                "term": "2025-2026-2",
+                "first_day": "2026-02-23",
+                "fetched_at": (now - timedelta(days=150)).isoformat(
+                    timespec="seconds"
+                ),
+                "courses": history_courses,
+                "changes": history_changes,
+                "calendar": [],
+            },
+        ],
         "period_times": [
             {"index": index, "start": start, "end": end}
             for index, start, end in PERIODS
@@ -141,7 +188,7 @@ def status():
         "last_error": None,
         "notification_error": None,
         "cloud_status": "skipped",
-        "version": "1.1.0",
+        "version": "1.2.0",
     }
 
 
@@ -211,7 +258,7 @@ def diagnostics():
         "format": "next-class-diagnostics",
         "version": 1,
         "generated_at": now.isoformat(timespec="seconds"),
-        "app_version": "1.1.0",
+        "app_version": "1.2.0",
         "platform": {
             "system": "Windows",
             "release": "fixture",

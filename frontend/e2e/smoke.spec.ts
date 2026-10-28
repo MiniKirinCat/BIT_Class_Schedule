@@ -54,6 +54,26 @@ test('week search, keyboard navigation, and course actions', async ({ page }) =>
   await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
 });
 
+test('switches to an archived term and back', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+
+  await page.getByRole('button', { name: /切换学期/ }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: '切换学期' })).toBeVisible();
+  await dialog.getByRole('button', { name: /2025-2026-2/ }).click();
+
+  await expect(page.getByRole('heading', { name: '学期回顾' })).toBeVisible();
+  await expect(page.getByText('历史测试课').first()).toBeVisible();
+  await page.locator('.bottom-nav').getByRole('button', { name: '周课表' }).click();
+  await expect(page.getByText('历史测试课').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /切换学期/ }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /2026-2027-1/ }).click();
+  await page.locator('.bottom-nav').getByRole('button', { name: '今天' }).click();
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+});
+
 test('course detail offers copy and ICS download', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: '周课表', exact: true }).click();

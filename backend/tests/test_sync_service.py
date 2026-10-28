@@ -234,6 +234,28 @@ def test_term_rollover_is_one_baseline_notice(tmp_path):
     assert "共 1 门课程" in content
 
 
+def test_term_rollover_keeps_previous_term_in_the_published_archive(tmp_path):
+    gateway = FakeGateway(fetched([ROW]))
+    publisher = FakePublisher()
+    service, _, _, _ = make_service(tmp_path, gateway, publisher=publisher)
+    run(service)
+
+    gateway.raw = fetched(
+        [{**ROW, "KCH": "PHY101", "KCM": "大学物理"}],
+        term="2026-2027-1",
+        first_day=date(2026, 9, 7),
+    )
+    run(service)
+
+    payload = publisher.payloads[-1]
+    assert payload["current_term"] == "2026-2027-1"
+    assert [term["term"] for term in payload["terms"]] == [
+        "2026-2027-1",
+        "2025-2026-1",
+    ]
+    assert payload["terms"][1]["courses"][0]["course_name"] == "高等数学"
+
+
 def test_term_rollover_to_empty_schedule_is_baseline_not_anomaly(tmp_path):
     gateway = FakeGateway(fetched([ROW]))
     service, settings, snapshots, notifier = make_service(tmp_path, gateway)
@@ -493,22 +515,25 @@ def test_publisher_payload_shape_includes_changes_before_and_after(tmp_path):
     run(service)
 
     payload = publisher.payloads[0]
-    assert payload["schema_version"] == 1
-    assert payload["app_version"] == "1.1.0"
+    assert payload["schema_version"] == 2
+    assert payload["app_version"] == "1.2.0"
     assert payload["synced_at"] == NOW.isoformat(timespec="seconds")
     assert payload["sync_interval_days"] == 1
-    assert payload["term"] == "2025-2026-1"
-    assert payload["first_day"] == "2025-09-01"
-    assert payload["courses"][0]["room"] == "A101"
-    assert payload["calendar"][0] == {"date": "2026-10-26", "week": 9, "weekday": 1}
+    assert payload["current_term"] == "2025-2026-1"
+    assert len(payload["terms"]) == 1
+    term = payload["terms"][0]
+    assert term["term"] == "2025-2026-1"
+    assert term["first_day"] == "2025-09-01"
+    assert term["courses"][0]["room"] == "A101"
+    assert term["calendar"][0] == {"date": "2026-10-26", "week": 9, "weekday": 1}
     assert len(payload["period_times"]) == 13
     assert payload["period_times"][0] == {"index": 1, "start": "08:00", "end": "08:45"}
-    assert payload["changes"] == []
+    assert term["changes"] == []
 
     gateway.raw = fetched([{**ROW, "JASMC": "B202"}])
     run(service)
 
-    change = publisher.payloads[1]["changes"][0]
+    change = publisher.payloads[1]["terms"][0]["changes"][0]
     assert {
         "id",
         "detected_at",

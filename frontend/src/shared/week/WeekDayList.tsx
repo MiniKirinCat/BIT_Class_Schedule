@@ -24,16 +24,20 @@ export function WeekDayList({
   onOpenCourse,
 }: WeekDayListProps) {
   const dates = weekDates(snapshot.first_day, week);
-  const [selected, setSelected] = useState(() =>
-    dates.includes(today) ? today : dates[0],
-  );
+  const weekSessions = coursesForWeek(snapshot, week);
+  const preferred =
+    (dates.includes(today) && today) ||
+    dates.find((date) =>
+      weekSessions.some((course) => course.weekday === weekdayOf(date)),
+    ) ||
+    dates[0];
+  const [selected, setSelected] = useState(preferred);
 
   useEffect(() => {
-    setSelected(dates.includes(today) ? today : dates[0]);
-  }, [week, today, snapshot.first_day]);
+    setSelected(preferred);
+  }, [preferred]);
 
   const weekday = weekdayOf(selected);
-  const weekSessions = coursesForWeek(snapshot, week);
   const sessions = weekSessions
     .filter((course) => course.weekday === weekday)
     .sort((a, b) => a.start_period - b.start_period);

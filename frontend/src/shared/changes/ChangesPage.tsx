@@ -12,15 +12,24 @@ interface ChangesPageProps {
   changes: ChangeRecord[];
   lastSeenId: number;
   onSeen: (id: number) => void;
+  term?: string;
+  archived?: boolean;
 }
 
-export function ChangesPage({ changes, lastSeenId, onSeen }: ChangesPageProps) {
+export function ChangesPage({
+  changes,
+  lastSeenId,
+  onSeen,
+  term,
+  archived = false,
+}: ChangesPageProps) {
   useEffect(() => {
+    if (archived) return;
     const newest = maxChangeId(changes);
     if (newest > lastSeenId) {
       onSeen(newest);
     }
-  }, [changes, lastSeenId, onSeen]);
+  }, [archived, changes, lastSeenId, onSeen]);
 
   const groups = groupChangesByDate(changes);
 
@@ -28,7 +37,9 @@ export function ChangesPage({ changes, lastSeenId, onSeen }: ChangesPageProps) {
     <section className="changes-page">
       <header className="page-head">
         <div>
-          <p className="eyebrow">最近 50 条</p>
+          <p className="eyebrow">
+            {archived && term ? `${term} · 历史学期` : '最近 50 条'}
+          </p>
           <h2 className="page-title">变动</h2>
         </div>
       </header>
@@ -55,7 +66,7 @@ export function ChangesPage({ changes, lastSeenId, onSeen }: ChangesPageProps) {
                       <div className="change-summary">{change.summary}</div>
                       <div className="change-time">{formatDateTime(change.detected_at)}</div>
                     </div>
-                    {change.id > lastSeenId && (
+                    {!archived && change.id > lastSeenId && (
                       <span className="unread-dot" role="status" aria-label="未读" />
                     )}
                   </article>

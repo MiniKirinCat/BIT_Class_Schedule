@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   CourseSession,
-  ScheduleSnapshot,
+  ScheduleArchive,
   TodayLayout,
   WeekLayout,
 } from '../types';
+import {
+  currentSnapshot,
+  isArchivedTerm,
+  snapshotForTerm,
+} from '../lib/archive';
 import {
   dateKeyInShanghai,
   formatDateTime,
@@ -28,6 +33,8 @@ import { WeekPage } from '../shared/week/WeekPage';
 import { ChangesPage } from '../shared/changes/ChangesPage';
 import { CourseDetailSheet } from '../shared/today/CourseDetailSheet';
 import { LayoutSheet } from '../shared/today/LayoutSheet';
+import { TermSheet } from '../shared/TermSheet';
+import { TermOverview } from '../shared/history/TermOverview';
 import { CloudConnect } from './CloudConnect';
 import { DevicePage } from './DevicePage';
 import {
@@ -42,7 +49,8 @@ import {
 
 export function CloudApp() {
   const [config, setConfig] = useState<CloudConfig | null>(null);
-  const [snapshot, setSnapshot] = useState<ScheduleSnapshot | null>(null);
+  const [archive, setArchive] = useState<ScheduleArchive | null>(null);
+  const [selectedTerm, setSelectedTerm] = useState('');
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
@@ -53,8 +61,10 @@ export function CloudApp() {
   const [page, setPage] = useState<PageKey>('today');
   const [course, setCourse] = useState<CourseSession | null>(null);
   const [layoutSheet, setLayoutSheet] = useState(false);
+  const [termSheet, setTermSheet] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [lastSeenId, setLastSeenId] = useState(readLastSeenChangeId);
+  const currentTermRef = useRef('');
 
   const [todayLayout, setTodayLayout] = useStoredChoice<TodayLayout>(
     STORAGE_KEYS.todayLayout,
@@ -81,7 +91,23 @@ export function CloudApp() {
     setWarning('');
     try {
       const result = await loadCloudSnapshot(target);
-      setSnapshot(result.snapshot);
+      setArchive(result.archive);
+      setSelectedTerm((previous) => {
+        if (
+          !previous ||
+          !result.archive.terms.some((term) => term.term === previous)
+        ) {
+          return result.archive.current_term;
+        }
+        if (
+          previous === currentTermRef.current &&
+          result.archive.current_term !== previous
+        ) {
+          return result.archive.current_term;
+        }
+        return previous;
+      });
+      currentTermRef.current = result.archive.current_term;
       setFromCache(result.source === 'cache');
       setCachedAt(result.cachedAt);
       setWarning(result.warning);
@@ -90,7 +116,8 @@ export function CloudApp() {
         caught instanceof CloudLoadError
           ? caught
           : new CloudLoadError('network', '无法获取云端快照');
-      setSnapshot(null);
+      setArchive(null);
+      setSelectedTerm('');
       setFromCache(false);
       setCachedAt(null);
       setError(nextError);
@@ -163,7 +190,10 @@ export function CloudApp() {
     (next: CloudConfig) => {
       saveCloudConfig(next);
       setConfig(next);
-      setSnapshot(null);
+      setArchive(null);
+      setSelectedTerm('');
+      currentTermRef.current = '';
+      setTermSheet(false);
       setPage('today');
       void load(next);
     },
@@ -178,7 +208,10 @@ export function CloudApp() {
     setTheme('warm');
     setLastSeenId(0);
     setConfig(null);
-    setSnapshot(null);
+    setArchive(null);
+    setSelectedTerm('');
+    currentTermRef.current = '';
+    setTermSheet(false);
     setError(null);
     setFromCache(false);
     setCachedAt(null);
@@ -211,7 +244,7 @@ export function CloudApp() {
     return <CloudConnect onSubmit={connect} busy={loading} />;
   }
 
-  if (!snapshot && loading) {
+  if (!archive && loading) {
     return (
       <div className="loading-screen">
         <span className="spinner" aria-hidden="true" />
@@ -220,7 +253,7 @@ export function CloudApp() {
     );
   }
 
-  if (!snapshot) {
+  if (!archive) {
     const decryptFailure = error?.kind === 'decrypt' || error?.kind === 'format';
     return (
       <div className="setup-shell">
@@ -255,13 +288,19 @@ export function CloudApp() {
     );
   }
 
-  const unread = unreadChangeCount(snapshot.changes, lastSeenId);
+  const current = currentSnapshot(archive);
+  const snapshot = snapshotForTerm(
+    archive,
+    selectedTerm || archive.current_term,
+  );
+  const archived = isArchivedTerm(archive, snapshot.term);
+  const unread = unreadChangeCount(current.changes, lastSeenId);
   const today = dateKeyInShanghai(now);
   const banner = fromCache ? (
     <div className="cloud-banner" role="status">
       <strong>正在显示缓存快照</strong>
       <span>
-        {warning || '无法连接云端。'} 快照同步于 {formatDateTime(snapshot.synced_at)}
+        {warning || '无法连接云端。'} 快照同步于 {formatDateTime(current.synced_at)}
         {cachedAt ? ` · 本机缓存于 ${formatDateTime(cachedAt)}` : ''}
         {lastPullAt ? ` · 本次拉取 ${formatDateTime(lastPullAt)}` : ''}
       </span>
@@ -281,7 +320,8 @@ export function CloudApp() {
     content = (
       <DevicePage
         config={config}
-        snapshot={snapshot}
+        snapshot={current}
+        termCount={archive.terms.length}
         fromCache={fromCache}
         cachedAt={cachedAt}
         lastPullAt={lastPullAt}
@@ -299,9 +339,11 @@ export function CloudApp() {
   } else if (page === 'week') {
     content = (
       <WeekPage
+        key={snapshot.term}
         snapshot={snapshot}
         layout={weekLayout}
         today={today}
+        weekAnchor={archived ? null : undefined}
         onLayoutChange={setWeekLayout}
         onOpenCourse={setCourse}
       />
@@ -312,6 +354,17 @@ export function CloudApp() {
         changes={snapshot.changes}
         lastSeenId={lastSeenId}
         onSeen={markSeen}
+        term={snapshot.term}
+        archived={archived}
+      />
+    );
+  } else if (archived) {
+    content = (
+      <TermOverview
+        snapshot={snapshot}
+        onOpenCourse={setCourse}
+        onGoWeek={() => setPage('week')}
+        onOpenChanges={() => setPage('changes')}
       />
     );
   } else {
@@ -332,13 +385,16 @@ export function CloudApp() {
   return (
     <>
       <AppShell
-        snapshot={snapshot}
+        snapshot={current}
         page={page}
         onNavigate={setPage}
         cloudMode
+        term={snapshot.term}
+        currentTerm={archive.current_term}
+        onChooseTerm={() => setTermSheet(true)}
         statusChip={
           <StaleBadge
-            snapshot={snapshot}
+            snapshot={current}
             cached={fromCache}
             verboseSyncTime
           />
@@ -362,6 +418,18 @@ export function CloudApp() {
             setLayoutSheet(false);
           }}
           onClose={() => setLayoutSheet(false)}
+        />
+      )}
+      {termSheet && (
+        <TermSheet
+          archive={archive}
+          selectedTerm={snapshot.term}
+          onSelect={(term) => {
+            setSelectedTerm(term);
+            setCourse(null);
+            setTermSheet(false);
+          }}
+          onClose={() => setTermSheet(false)}
         />
       )}
     </>

@@ -24,7 +24,7 @@ const COURSE: CourseSession = {
 
 const SNAPSHOT: ScheduleSnapshot = {
   schema_version: 1,
-  app_version: '1.1.0',
+  app_version: '1.2.0',
   synced_at: '2026-10-26T08:00:00+08:00',
   sync_interval_days: 1,
   term: '2026-2027-1',

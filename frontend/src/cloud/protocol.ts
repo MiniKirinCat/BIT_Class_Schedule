@@ -1,4 +1,9 @@
-import type { ScheduleSnapshot } from '../types';
+import type {
+  ScheduleArchive,
+  ScheduleSnapshot,
+  TermArchive,
+} from '../types';
+import { archiveFromSnapshot } from '../lib/archive';
 import { readStorage, removeStorage, writeStorage } from '../lib/storage';
 
 export interface CloudConfig {
@@ -8,12 +13,12 @@ export interface CloudConfig {
 }
 
 export interface CloudCache {
-  snapshot: ScheduleSnapshot;
+  archive: ScheduleArchive;
   cachedAt: string;
 }
 
 export interface LoadedCloudSnapshot {
-  snapshot: ScheduleSnapshot;
+  archive: ScheduleArchive;
   source: 'network' | 'cache';
   cachedAt: string | null;
   warning: string;
@@ -150,8 +155,10 @@ export function readCloudCache(): CloudCache | null {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed) || typeof parsed.cachedAt !== 'string') return null;
+    const value = parsed.archive ?? parsed.snapshot;
+    if (value === undefined) return null;
     return {
-      snapshot: validateSnapshot(parsed.snapshot),
+      archive: validateArchive(value),
       cachedAt: parsed.cachedAt,
     };
   } catch {
@@ -159,11 +166,11 @@ export function readCloudCache(): CloudCache | null {
   }
 }
 
-export function saveCloudCache(snapshot: ScheduleSnapshot): void {
+export function saveCloudCache(archive: ScheduleArchive): void {
   writeStorage(
     CACHE_KEY,
     JSON.stringify({
-      snapshot,
+      archive,
       cachedAt: new Date().toISOString(),
     }),
   );
@@ -253,29 +260,9 @@ function invalidSnapshot(): never {
   throw new CloudLoadError('format', '快照内容不完整或版本不受支持');
 }
 
-export function validateSnapshot(value: unknown): ScheduleSnapshot {
-  if (!isRecord(value) || value.schema_version !== 1) invalidSnapshot();
-  if (
-    typeof value.synced_at !== 'string' ||
-    Number.isNaN(Date.parse(value.synced_at)) ||
-    typeof value.first_day !== 'string' ||
-    typeof value.term !== 'string' ||
-    typeof value.app_version !== 'string' ||
-    typeof value.sync_interval_days !== 'number'
-  ) {
-    invalidSnapshot();
-  }
-  if (
-    !Array.isArray(value.courses) ||
-    !Array.isArray(value.changes) ||
-    !Array.isArray(value.calendar) ||
-    !Array.isArray(value.period_times) ||
-    value.period_times.length === 0
-  ) {
-    invalidSnapshot();
-  }
-
-  for (const course of value.courses) {
+function validateCourses(value: unknown): void {
+  if (!Array.isArray(value)) invalidSnapshot();
+  for (const course of value) {
     if (
       !isRecord(course) ||
       typeof course.course_code !== 'string' ||
@@ -293,8 +280,11 @@ export function validateSnapshot(value: unknown): ScheduleSnapshot {
       invalidSnapshot();
     }
   }
+}
 
-  for (const change of value.changes) {
+function validateChanges(value: unknown): void {
+  if (!Array.isArray(value)) invalidSnapshot();
+  for (const change of value) {
     if (
       !isRecord(change) ||
       typeof change.id !== 'number' ||
@@ -305,8 +295,11 @@ export function validateSnapshot(value: unknown): ScheduleSnapshot {
       invalidSnapshot();
     }
   }
+}
 
-  for (const entry of value.calendar) {
+function validateCalendar(value: unknown): void {
+  if (!Array.isArray(value)) invalidSnapshot();
+  for (const entry of value) {
     if (
       !isRecord(entry) ||
       typeof entry.date !== 'string' ||
@@ -316,8 +309,11 @@ export function validateSnapshot(value: unknown): ScheduleSnapshot {
       invalidSnapshot();
     }
   }
+}
 
-  for (const period of value.period_times) {
+function validatePeriodTimes(value: unknown): void {
+  if (!Array.isArray(value) || value.length === 0) invalidSnapshot();
+  for (const period of value) {
     if (
       !isRecord(period) ||
       !Number.isInteger(period.index) ||
@@ -327,8 +323,69 @@ export function validateSnapshot(value: unknown): ScheduleSnapshot {
       invalidSnapshot();
     }
   }
+}
 
+export function validateSnapshot(value: unknown): ScheduleSnapshot {
+  if (!isRecord(value) || value.schema_version !== 1) invalidSnapshot();
+  if (
+    typeof value.synced_at !== 'string' ||
+    Number.isNaN(Date.parse(value.synced_at)) ||
+    typeof value.first_day !== 'string' ||
+    typeof value.term !== 'string' ||
+    typeof value.app_version !== 'string' ||
+    typeof value.sync_interval_days !== 'number'
+  ) {
+    invalidSnapshot();
+  }
+  validateCourses(value.courses);
+  validateChanges(value.changes);
+  validateCalendar(value.calendar);
+  validatePeriodTimes(value.period_times);
   return value as unknown as ScheduleSnapshot;
+}
+
+function validateTermArchive(value: unknown): TermArchive {
+  if (
+    !isRecord(value) ||
+    typeof value.term !== 'string' ||
+    typeof value.first_day !== 'string' ||
+    typeof value.fetched_at !== 'string' ||
+    Number.isNaN(Date.parse(value.fetched_at))
+  ) {
+    invalidSnapshot();
+  }
+  validateCourses(value.courses);
+  validateChanges(value.changes);
+  validateCalendar(value.calendar);
+  return value as unknown as TermArchive;
+}
+
+export function validateArchive(value: unknown): ScheduleArchive {
+  if (isRecord(value) && value.schema_version === 1) {
+    return archiveFromSnapshot(validateSnapshot(value));
+  }
+  if (
+    !isRecord(value) ||
+    value.schema_version !== 2 ||
+    typeof value.app_version !== 'string' ||
+    typeof value.synced_at !== 'string' ||
+    Number.isNaN(Date.parse(value.synced_at)) ||
+    typeof value.sync_interval_days !== 'number' ||
+    typeof value.current_term !== 'string' ||
+    !Array.isArray(value.terms) ||
+    value.terms.length === 0
+  ) {
+    invalidSnapshot();
+  }
+  validatePeriodTimes(value.period_times);
+  const terms = value.terms.map(validateTermArchive);
+  if (
+    !terms.some((term) => term.term === value.current_term) ||
+    new Set(terms.map((term) => term.term)).size !== terms.length
+  ) {
+    invalidSnapshot();
+  }
+  return value as unknown as ScheduleArchive;
 }
 
 async function fetchEnvelope(
@@ -378,12 +435,12 @@ export async function loadCloudSnapshot(
   try {
     if (!fetcher) throw new CloudLoadError('network', '当前浏览器无法联网');
     const envelope = await fetchEnvelope(config, fetcher);
-    const snapshot = validateSnapshot(
+    const archive = validateArchive(
       await decryptSnapshotEnvelope(envelope, config.key),
     );
-    saveCloudCache(snapshot);
+    saveCloudCache(archive);
     return {
-      snapshot,
+      archive,
       source: 'network',
       cachedAt: null,
       warning: '',
@@ -397,7 +454,7 @@ export async function loadCloudSnapshot(
     const cache = readCloudCache();
     if (cache) {
       return {
-        snapshot: cache.snapshot,
+        archive: cache.archive,
         source: 'cache',
         cachedAt: cache.cachedAt,
         warning: error.message,

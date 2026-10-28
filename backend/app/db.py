@@ -241,11 +241,8 @@ class SnapshotRepo:
             )
             return int(cur.lastrowid)
 
-    def latest(self) -> SnapshotRecord | None:
-        with self.db.connect() as conn:
-            row = conn.execute("SELECT * FROM snapshots ORDER BY id DESC LIMIT 1").fetchone()
-        if row is None:
-            return None
+    @staticmethod
+    def _record(row: sqlite3.Row) -> SnapshotRecord:
         return SnapshotRecord(
             id=row["id"],
             sync_run_id=row["sync_run_id"],
@@ -257,6 +254,21 @@ class SnapshotRepo:
             payload_hash=row["payload_hash"],
             is_baseline=bool(row["is_baseline"]),
         )
+
+    def latest(self) -> SnapshotRecord | None:
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM snapshots ORDER BY id DESC LIMIT 1").fetchone()
+        return self._record(row) if row is not None else None
+
+    def latest_per_term(self) -> list[SnapshotRecord]:
+        with self.db.connect() as conn:
+            rows = conn.execute(
+                "SELECT s.* FROM snapshots s "
+                "JOIN (SELECT term, MAX(id) AS id FROM snapshots GROUP BY term) newest "
+                "ON s.id=newest.id "
+                "ORDER BY s.fetched_at DESC, s.id DESC"
+            ).fetchall()
+        return [self._record(row) for row in rows]
 
     def insert_changes(
         self,

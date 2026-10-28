@@ -1,3 +1,5 @@
+import type { ScheduleArchive, ScheduleSnapshot } from '../types';
+import { normalizeArchive } from '../lib/archive';
 import type {
   AppSettings,
   AppStatus,
@@ -48,7 +50,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   status: () => request<AppStatus>('/api/status'),
-  dashboard: () => request<import('../types').ScheduleSnapshot>('/api/dashboard'),
+  dashboard: async () =>
+    normalizeArchive(
+      await request<ScheduleArchive | ScheduleSnapshot>('/api/dashboard'),
+    ),
   settings: () => request<AppSettings>('/api/settings'),
   updateSettings: (payload: {
     sync_interval_days?: number;

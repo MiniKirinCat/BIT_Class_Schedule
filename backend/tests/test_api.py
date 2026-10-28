@@ -163,9 +163,9 @@ def test_setup_school_syncs_and_then_enforces_cooldown(tmp_path):
         dashboard = client.get("/api/dashboard")
         assert dashboard.status_code == 200
         body = dashboard.json()
-        assert body["courses"][0]["course_name"] == "高等数学"
+        assert body["current_term"] == "2025-2026-1"
+        assert body["terms"][0]["courses"][0]["course_name"] == "高等数学"
         assert len(body["period_times"]) == 13
-        assert body["term"] == "2025-2026-1"
 
         status = client.get("/api/status").json()
         assert status["configured"] is True
@@ -524,24 +524,27 @@ def test_dashboard_payload_contains_expected_fields(tmp_path):
         assert setup.status_code == 200
 
         body = client.get("/api/dashboard").json()
-        assert body["schema_version"] == 1
+        assert body["schema_version"] == 2
         assert body["app_version"] == AppConfig().app_version
         assert body["synced_at"]
         assert body["sync_interval_days"] == 1
-        assert body["term"] == "2025-2026-1"
-        assert body["first_day"] == "2025-09-01"
+        assert body["current_term"] == "2025-2026-1"
         assert len(body["period_times"]) == 13
         assert body["period_times"][0] == {
             "index": 1,
             "start": "08:00",
             "end": "08:45",
         }
-        assert [course["course_name"] for course in body["courses"]] == ["高等数学"]
-        assert body["courses"][0]["weeks"] == [1, 2, 3, 4]
-        assert body["calendar"] == [
+        assert len(body["terms"]) == 1
+        term = body["terms"][0]
+        assert term["term"] == "2025-2026-1"
+        assert term["first_day"] == "2025-09-01"
+        assert [course["course_name"] for course in term["courses"]] == ["高等数学"]
+        assert term["courses"][0]["weeks"] == [1, 2, 3, 4]
+        assert term["calendar"] == [
             {"date": "2026-10-26", "week": 9, "weekday": 1}
         ]
-        assert body["changes"] == []
+        assert term["changes"] == []
         assert body["sync_status"] == "success"
         assert body["last_attempt_at"]
         assert body["next_due_at"]
@@ -564,8 +567,9 @@ def test_dashboard_payload_contains_expected_fields(tmp_path):
         assert synced.json()["change_count"] == 1
 
         body = client.get("/api/dashboard").json()
-        assert len(body["changes"]) == 1
-        change = body["changes"][0]
+        changes = body["terms"][0]["changes"]
+        assert len(changes) == 1
+        change = changes[0]
         assert set(change) == {
             "id",
             "detected_at",

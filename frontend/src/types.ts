@@ -48,8 +48,33 @@ export interface ChangeRecord {
   after: Record<string, unknown> | null;
 }
 
+export interface TermArchive {
+  term: string;
+  first_day: string;
+  fetched_at: string;
+  courses: CourseSession[];
+  changes: ChangeRecord[];
+  calendar: CalendarEntry[];
+}
+
+export interface ScheduleArchive {
+  schema_version: 2;
+  app_version: string;
+  synced_at: string;
+  sync_interval_days: number;
+  current_term: string;
+  terms: TermArchive[];
+  period_times: PeriodTime[];
+  sync_status?: SyncStatus;
+  last_attempt_at?: string | null;
+  next_due_at?: string | null;
+  cloud_status?: CloudStatus;
+  last_error?: string | null;
+  configured?: boolean;
+}
+
 export interface ScheduleSnapshot {
-  schema_version: 1;
+  schema_version: 1 | 2;
   app_version: string;
   synced_at: string;
   sync_interval_days: number;

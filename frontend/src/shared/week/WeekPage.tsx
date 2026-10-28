@@ -13,6 +13,7 @@ interface WeekPageProps {
   snapshot: ScheduleSnapshot;
   layout: WeekLayout;
   today: string;
+  weekAnchor?: number | null;
   onLayoutChange: (layout: WeekLayout) => void;
   onOpenCourse: (course: CourseSession) => void;
 }
@@ -21,11 +22,16 @@ export function WeekPage({
   snapshot,
   layout,
   today,
+  weekAnchor,
   onLayoutChange,
   onOpenCourse,
 }: WeekPageProps) {
-  const thisWeek = Math.max(1, currentWeek(snapshot, today));
-  const [week, setWeek] = useState(thisWeek);
+  const anchorWeek =
+    weekAnchor === undefined
+      ? Math.max(1, currentWeek(snapshot, today))
+      : weekAnchor;
+  const initialWeek = anchorWeek ?? 1;
+  const [week, setWeek] = useState(initialWeek);
   const [search, setSearch] = useState('');
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const dates = weekDates(snapshot.first_day, week);
@@ -147,10 +153,10 @@ export function WeekPage({
           <button
             type="button"
             className="ghost-button"
-            disabled={week === thisWeek}
-            onClick={() => setWeek(thisWeek)}
+            disabled={week === initialWeek}
+            onClick={() => setWeek(initialWeek)}
           >
-            本周
+            {anchorWeek === null ? '首周' : '本周'}
           </button>
         </div>
       </div>

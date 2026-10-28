@@ -35,40 +35,82 @@ function fixtureSnapshot() {
       weekday: ((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7) + 1,
     };
   });
+  const now = new Date().toISOString();
+  const archivedAt = new Date(Date.now() - 150 * 86_400_000).toISOString();
+  const historyFirstDay = addDays(firstDay, -120);
+
   return {
-    schema_version: 1,
-    app_version: '1.1.0',
-    synced_at: new Date().toISOString(),
+    schema_version: 2,
+    app_version: '1.2.0',
+    synced_at: now,
     sync_interval_days: 1,
-    term: '2026-2027-1',
-    first_day: firstDay,
-    courses: [
+    current_term: '2026-2027-1',
+    terms: [
       {
-        course_code: 'CLOUD101',
-        course_name: '快照测试课',
-        teacher: '云端老师',
-        room: '云端楼 101',
-        campus: '良乡',
-        weekday,
-        start_period: 3,
-        end_period: 4,
-        weeks: [8],
-        raw_time_text: '快照测试',
+        term: '2026-2027-1',
+        first_day: firstDay,
+        fetched_at: now,
+        courses: [
+          {
+            course_code: 'CLOUD101',
+            course_name: '快照测试课',
+            teacher: '云端老师',
+            room: '云端楼 101',
+            campus: '良乡',
+            weekday,
+            start_period: 3,
+            end_period: 4,
+            weeks: [8],
+            raw_time_text: '快照测试',
+          },
+        ],
+        changes: [
+          {
+            id: 2,
+            detected_at: now,
+            type: 'modified',
+            course_code: 'CLOUD101',
+            course_name: '快照测试课',
+            summary: '快照测试课：调整教室 云端楼 101 → 云端楼 202',
+            before: null,
+            after: null,
+          },
+        ],
+        calendar,
+      },
+      {
+        term: '2025-2026-2',
+        first_day: historyFirstDay,
+        fetched_at: archivedAt,
+        courses: [
+          {
+            course_code: 'HIST101',
+            course_name: '历史快照课',
+            teacher: '历史老师',
+            room: '旧教学楼 201',
+            campus: '中关村',
+            weekday: 2,
+            start_period: 1,
+            end_period: 2,
+            weeks: [1],
+            raw_time_text: '历史学期测试',
+          },
+        ],
+        changes: [
+          {
+            id: 1,
+            detected_at: archivedAt,
+            type: 'added',
+            course_code: 'HIST101',
+            course_name: '历史快照课',
+            summary: '新增：周二 1-2 节 历史快照课 · 旧教学楼 201',
+            before: null,
+            after: null,
+          },
+        ],
+        calendar: [],
       },
     ],
-    changes: [
-      {
-        id: 1,
-        detected_at: new Date().toISOString(),
-        type: 'modified',
-        course_code: 'CLOUD101',
-        course_name: '快照测试课',
-        summary: '快照测试课：调整教室 云端楼 101 → 云端楼 202',
-        before: null,
-        after: null,
-      },
-    ],
-    calendar,
     period_times: [
       ['08:00', '08:45'],
       ['08:50', '09:35'],
@@ -140,6 +182,8 @@ test('cloud PWA imports a QR fragment, decrypts and falls back to cache', async 
 
   await page.getByRole('button', { name: '设备' }).click();
   await expect(page.getByText('云端最新快照')).toBeVisible();
+  await expect(page.getByText(/2 个学期/)).toBeVisible();
+  await expect(page.getByText('离线应用壳')).toBeVisible();
   await page.getByRole('button', { name: '雾蓝' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'fog');
 
@@ -148,6 +192,80 @@ test('cloud PWA imports a QR fragment, decrypts and falls back to cache', async 
   await page.reload();
   await expect(page.getByText('正在显示缓存快照')).toBeVisible();
   await expect(page.getByText(/缓存快照 ·/)).toBeVisible();
+});
+
+test('cloud PWA switches to an archived term and back', async ({ page }) => {
+  const envelope = await encryptSnapshot(fixtureSnapshot());
+  await page.route(RAW_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify(envelope),
+    }),
+  );
+  const hash = new URLSearchParams({
+    v: '1',
+    snapshot: RAW_URL,
+    gist: 'gist-e2e',
+    key: KEY,
+  }).toString();
+  await page.goto(`${CLOUD_URL}/#${hash}`);
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+
+  await page.getByRole('button', { name: /切换学期/ }).click();
+  let dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('heading', { name: '切换学期' })).toBeVisible();
+  await dialog.getByRole('button', { name: /2025-2026-2/ }).click();
+
+  await expect(page.getByRole('heading', { name: '学期回顾' })).toBeVisible();
+  await expect(page.getByText('历史快照课').first()).toBeVisible();
+  await page.locator('.bottom-nav').getByRole('button', { name: '周课表' }).click();
+  await expect(page.getByText('历史快照课').first()).toBeVisible();
+
+  await page.getByRole('button', { name: /切换学期/ }).click();
+  dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: /2026-2027-1/ }).click();
+  await page.locator('.bottom-nav').getByRole('button', { name: '今天' }).click();
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByText('快照测试课').first()).toBeVisible();
+});
+
+test('cloud PWA opens the cached shell when offline', async ({ page }) => {
+  const envelope = await encryptSnapshot(fixtureSnapshot());
+  await page.route(RAW_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify(envelope),
+    }),
+  );
+  const hash = new URLSearchParams({
+    v: '1',
+    snapshot: RAW_URL,
+    gist: 'gist-e2e',
+    key: KEY,
+  }).toString();
+  await page.goto(`${CLOUD_URL}/#${hash}`);
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.waitForFunction(
+    () => navigator.serviceWorker.controller !== null,
+  );
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+
+  await page.route('https://gist.example/**', (route) => route.abort());
+  await page.route('https://api.github.com/**', (route) => route.abort());
+  await page.context().setOffline(true);
+  await page.reload();
+  await expect(page.getByText('正在显示缓存快照')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await page.context().setOffline(false);
 });
 
 test('cloud PWA shows the manual connection form without pairing data', async ({

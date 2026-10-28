@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ScheduleSnapshot, ThemeName, TodayLayout, WeekLayout } from '../types';
 import { formatDateTime } from '../lib/schedule';
 import { ThemePicker } from '../shared/ThemePicker';
@@ -7,6 +7,7 @@ import { maskSnapshotUrl, type CloudConfig } from './protocol';
 interface DevicePageProps {
   config: CloudConfig;
   snapshot: ScheduleSnapshot;
+  termCount: number;
   fromCache: boolean;
   cachedAt: string | null;
   lastPullAt: string | null;
@@ -24,6 +25,7 @@ interface DevicePageProps {
 export function DevicePage({
   config,
   snapshot,
+  termCount,
   fromCache,
   cachedAt,
   lastPullAt,
@@ -38,6 +40,27 @@ export function DevicePage({
   onDisconnect,
 }: DevicePageProps) {
   const [confirmClear, setConfirmClear] = useState(false);
+  const [offlineShell, setOfflineShell] = useState<
+    'ready' | 'pending' | 'unsupported'
+  >('pending');
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) {
+      setOfflineShell('unsupported');
+      return;
+    }
+    let active = true;
+    void navigator.serviceWorker.ready
+      .then(() => {
+        if (active) setOfflineShell('ready');
+      })
+      .catch(() => {
+        if (active) setOfflineShell('pending');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <section className="settings-page">
@@ -61,6 +84,24 @@ export function DevicePage({
         <div className="settings-row">
           <span>解密密钥</span>
           <span className="settings-value is-ok">已保存在本机</span>
+        </div>
+        <div className="settings-row">
+          <span>学期归档</span>
+          <span className="settings-value">
+            {termCount} 个学期 · 当前 {snapshot.term}
+          </span>
+        </div>
+        <div className="settings-row">
+          <span>离线应用壳</span>
+          <span
+            className={`settings-value ${offlineShell === 'ready' ? 'is-ok' : ''}`}
+          >
+            {offlineShell === 'ready'
+              ? '已缓存，断网可打开'
+              : offlineShell === 'unsupported'
+                ? '当前浏览器不支持'
+                : '首次联网加载后可用'}
+          </span>
         </div>
         <div className="settings-row">
           <span>最后同步</span>
@@ -139,7 +180,7 @@ export function DevicePage({
       <section className="settings-section">
         <h3>本机数据</h3>
         <p className="form-hint">
-          本机保存快照地址、解密密钥、最近一次成功解密的明文快照，以及布局和主题偏好。
+          本机保存快照地址、解密密钥、最近一次成功解密的全部学期快照，以及布局和主题偏好。
         </p>
         <div className="form-actions">
           <button
