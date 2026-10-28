@@ -29,4 +29,4 @@ try {
 }
 
 New-Item -ItemType Directory -Force -Path data | Out-Null
-Write-Host "初始化完成。运行 scripts\start.ps1 启动下一节。"
+Write-Host "初始化完成。双击 start.vbs 或运行 scripts\start.ps1 启动下一节。"

@@ -71,9 +71,10 @@ def error_detail(exc: Exception) -> str:
 
 
 class TrayApp:
-    def __init__(self) -> None:
+    def __init__(self, open_on_start: bool = False) -> None:
         self.url: str | None = None
         self.child: subprocess.Popen | None = None
+        self.open_on_start = open_on_start
         self.status_text = "正在启动…"
         self._stop = threading.Event()
         self._syncing = threading.Lock()
@@ -237,10 +238,12 @@ class TrayApp:
         else:
             self.update_status()
             threading.Thread(target=self.poll, daemon=True).start()
+            if self.open_on_start:
+                self.open()
         self.icon.run()
 
 
-def acquire_mutex():
+def acquire_mutex(open_existing: bool = False):
     if sys.platform != "win32":
         return None
     kernel32 = ctypes.windll.kernel32
@@ -257,7 +260,7 @@ def acquire_mutex():
     if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
         kernel32.CloseHandle(handle)
         runtime = read_runtime()
-        if runtime and health(runtime["url"]):
+        if open_existing and runtime and health(runtime["url"]):
             webbrowser.open(runtime["url"])
         return None
     return handle
@@ -267,11 +270,12 @@ def main() -> None:
     if sys.platform != "win32":
         print("下一节托盘目前只支持 Windows")
         raise SystemExit(1)
-    handle = acquire_mutex()
+    open_on_start = "--open" in sys.argv[1:]
+    handle = acquire_mutex(open_on_start)
     if handle is None:
         return
     try:
-        TrayApp().run()
+        TrayApp(open_on_start=open_on_start).run()
     finally:
         ctypes.windll.kernel32.CloseHandle(handle)
 

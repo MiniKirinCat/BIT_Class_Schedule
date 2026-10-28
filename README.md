@@ -23,26 +23,27 @@ powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 
 ## 启动与停止
 
+最省事的方式是双击项目根目录的 `start.vbs`。它会用 `pythonw` 启动托盘并打开页面，不会出现终端窗口；之后通过托盘图标操作。如果系统禁用了 VBS，改用下面的 `scripts\start.ps1`。
+
+也可以在 PowerShell 中运行：
+
 ```powershell
 scripts\start.ps1
 ```
 
-启动器会：
+默认会在后台启动托盘并打开页面，脚本立即返回，这个终端窗口可以直接关闭。已有健康实例时只会复用并打开现有页面。
 
-- 如果已有健康的下一节实例，直接打开它，不启动第二个进程；
-- 否则默认尝试 `127.0.0.1:17800`；被占用时向系统申请一个空闲端口；
-- 若设置了 `NEXT_CLASS_PORT`，则只使用该端口，被占用时报错，不自动改端口；
-- 把实际端口和 PID 写入 `data\runtime.json`，然后打开浏览器。
+- `scripts\start.ps1 -NoOpen`：后台启动托盘，不自动打开浏览器。
+- `scripts\start.ps1 -Foreground`：前台运行服务并保留控制台日志（先停止现有实例），适合调试；关闭终端会停止服务。
+- `scripts\stop.ps1`：停止当前实例；托盘菜单“退出并停止服务”同样有效。
 
-```powershell
-scripts\stop.ps1
-```
+服务默认尝试 `127.0.0.1:17800`；被占用时向系统申请一个空闲端口。若设置 `NEXT_CLASS_PORT`，则只使用该端口，被占用时报错。实际端口和 PID 写入 `data\runtime.json`。
 
 如果 PowerShell 执行策略阻止脚本，改用 `powershell -ExecutionPolicy Bypass -File scripts\start.ps1`（停止同理）。停止脚本只会结束 `data\runtime.json` 指向且命令行匹配本应用的进程，不会杀占用端口的其他程序。
 
 ## 托盘与开机自启
 
-日常使用建议从托盘运行，不必每次开一个控制台窗口：
+日常使用建议双击 `start.vbs`，或运行 `scripts\start.ps1`，托盘会在后台运行，不必保留终端窗口。也可以直接运行：
 
 ```powershell
 .venv\Scripts\pythonw.exe scripts\tray.py
@@ -56,7 +57,7 @@ scripts\stop.ps1
 - **查看日志**：打开 `data\app.log`；
 - **退出并停止服务**：同时结束本应用启动的本地服务，不需要再运行停止脚本。
 
-托盘启动时会复用已经健康的本地实例；没有实例时才在后台启动一个隐藏窗口的服务。重复运行托盘不会启动第二份，只会打开现有页面。
+托盘启动时会复用已经健康的本地实例；没有实例时才在后台启动一个无控制台窗口的服务。重复运行托盘不会启动第二份；`start.vbs` 和默认的 `scripts\start.ps1` 会带 `--open`，因此会打开现有页面。
 
 在 **设置 → 启动与退出 → 开启开机自启** 会在 Windows 启动文件夹创建 `下一节.lnk`，登录后自动运行托盘；再次点击即可关闭。该操作写入当前用户目录，不需要管理员权限。
 
