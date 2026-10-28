@@ -81,10 +81,44 @@ def test_login_failure_is_wrapped_without_password():
     with pytest.raises(SchoolError) as exc:
         gateway.fetch("20250001", "hunter2")
     assert exc.value.code == "LOGIN_FAILED"
-    assert str(exc.value) == "登录教务系统失败，请检查账号密码或网络"
+    assert str(exc.value) == "登录教务系统失败，请检查账号密码，或确认当前网络能访问校园网/WebVPN"
     assert "hunter2" not in str(exc.value)
     assert exc.value.__cause__ is None
     assert exc.value.__suppress_context__ is True
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("需要短信验证码", "短信验证码"),
+        ("captcha required", "验证码"),
+        ("请求过于频繁", "过于频繁"),
+        ("请求超时", "超时"),
+        ("无法连接统一身份认证服务", "无法连接"),
+    ],
+)
+def test_login_errors_are_actionable(raw, expected):
+    gateway = BitSchoolGateway(
+        login=lambda u, p: (_ for _ in ()).throw(RuntimeError(raw)),
+        fetch_courses=lambda s: RAW,
+    )
+    with pytest.raises(SchoolError) as exc:
+        gateway.fetch("20250001", "pw")
+    assert expected in str(exc.value)
+    assert exc.value.code == "LOGIN_FAILED"
+
+
+def test_course_fetch_error_is_actionable():
+    gateway = BitSchoolGateway(
+        login=lambda u, p: object(),
+        fetch_courses=lambda s: (_ for _ in ()).throw(
+            RuntimeError("教学中心未返回本科课程表")
+        ),
+    )
+    with pytest.raises(SchoolError) as exc:
+        gateway.fetch("20250001", "pw")
+    assert exc.value.code == "FETCH_FAILED"
+    assert "本科课表" in str(exc.value)
 
 
 def test_missing_first_day_is_data_error():

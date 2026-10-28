@@ -1,33 +1,42 @@
-from typing import Callable
+from typing import Callable, Protocol
+from urllib.parse import quote
 
 import httpx
 
 from .security import redact
 
-PUSHPLUS_URL = "https://www.pushplus.plus/send"
+SERVERCHAN_URL = "https://sctapi.ftqq.com/{sendkey}.send"
 
 
 class NotificationError(Exception):
     pass
 
 
-class PushPlusNotifier:
+class Notifier(Protocol):
+    def is_configured(self) -> bool: ...
+
+    def send(self, title: str, content: str) -> None: ...
+
+    def close(self) -> None: ...
+
+
+class ServerChanNotifier:
     def __init__(
         self,
-        token_provider: Callable[[], str | None],
+        sendkey_provider: Callable[[], str | None],
         client: httpx.Client | None = None,
         timeout: float = 10.0,
     ):
-        self._token_provider = token_provider
+        self._sendkey_provider = sendkey_provider
         self._owns_client = client is None
         self._client = client if client is not None else httpx.Client(timeout=timeout)
 
     def is_configured(self) -> bool:
         try:
-            token = self._token_provider()
+            sendkey = self._sendkey_provider()
         except Exception:
             return False
-        return bool(str(token).strip()) if token is not None else False
+        return bool(str(sendkey).strip()) if sendkey is not None else False
 
     def close(self) -> None:
         if self._owns_client:
@@ -35,24 +44,30 @@ class PushPlusNotifier:
 
     def send(self, title: str, content: str) -> None:
         try:
-            token = self._token_provider()
+            sendkey = self._sendkey_provider()
         except Exception:
-            raise NotificationError("无法读取 PushPlus 配置") from None
-        token_text = str(token).strip() if token is not None else ""
-        if not token_text:
-            raise NotificationError("PushPlus 未配置")
+            raise NotificationError("无法读取 Server酱配置") from None
+        sendkey_text = str(sendkey).strip() if sendkey is not None else ""
+        if not sendkey_text:
+            raise NotificationError("Server酱 SendKey 未配置")
 
         def safe(value: object, limit: int) -> str:
-            return redact(str(value)).replace(token_text, "[REDACTED]")[:limit]
+            return redact(str(value)).replace(sendkey_text, "[REDACTED]")[:limit]
 
-        last_error = "PushPlus 发送失败"
-        payload = {"token": token_text, "title": title, "content": content, "template": "txt"}
-        for _ in range(2):
+        url = SERVERCHAN_URL.format(sendkey=quote(sendkey_text, safe=""))
+        payload = {
+            "title": " ".join(str(title).splitlines()).strip()[:120] or "下一节提醒",
+            "desp": content,
+        }
+        last_error = "Server酱发送失败"
+        for attempt in range(2):
             try:
-                response = self._client.post(PUSHPLUS_URL, json=payload)
+                response = self._client.post(url, data=payload)
             except httpx.HTTPError as exc:
                 last_error = safe(exc, 200) or type(exc).__name__
-                continue
+                if attempt == 0:
+                    continue
+                break
 
             try:
                 body = response.json()
@@ -60,16 +75,27 @@ class PushPlusNotifier:
                 body = None
 
             code = body.get("code") if isinstance(body, dict) else None
-            if response.status_code == 200 and str(code) == "200":
+            if response.status_code == 200 and str(code) == "0":
                 return
 
-            detail = f"PushPlus 返回异常（HTTP {response.status_code}"
+            detail = f"Server酱返回异常（HTTP {response.status_code}"
             if code is not None and str(code).strip():
                 detail += f"，code {safe(code, 40)}"
-            message = body.get("msg") if isinstance(body, dict) else ""
+            message = ""
+            if isinstance(body, dict):
+                message = body.get("message") or body.get("msg") or ""
+                data = body.get("data")
+                if not message and isinstance(data, dict):
+                    message = data.get("error") or data.get("message") or ""
             if message:
                 detail += f"：{safe(message, 80)}"
             if not isinstance(body, dict):
                 detail += "，响应格式错误"
             last_error = detail + "）"
+
+            if response.status_code < 500:
+                raise NotificationError(last_error)
+            if attempt == 0:
+                continue
+            break
         raise NotificationError(last_error)

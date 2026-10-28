@@ -33,6 +33,21 @@ test('mobile local app: today layouts, week layouts, changes, and theme', async 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'warm');
 });
 
+test('settings shows diagnostics, preflight, and startup controls', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '设置' }).click();
+  await expect(page.getByRole('heading', { name: '诊断' })).toBeVisible();
+  await expect(page.getByText('Server酱', { exact: true })).toBeVisible();
+  await expect(page.getByText('课程 4')).toBeVisible();
+
+  await page.getByRole('button', { name: '运行环境自检' }).click();
+  await expect(page.getByText(/Windows 凭据管理器：可用/)).toBeVisible();
+  await expect(page.getByText(/统一身份认证：可访问/)).toBeVisible();
+
+  await page.getByRole('button', { name: '开启开机自启' }).click();
+  await expect(page.getByRole('button', { name: '关闭开机自启' })).toBeVisible();
+});
+
 test.describe('desktop week default', () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 

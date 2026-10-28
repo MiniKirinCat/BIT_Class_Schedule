@@ -12,10 +12,17 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .cloud import CloudError, normalize_pages_url
-from .config import AppConfig
+from .config import PROJECT_ROOT, AppConfig
 from .container import Container, build_container
+from .diagnostics import build_report, run_preflight, sync_run_payload
 from .schedule import PERIOD_TIMES
 from .security import CredentialError, redact, safe_message
+from .startup import (
+    StartupError,
+    disable_startup,
+    enable_startup,
+    startup_status,
+)
 from .sync_service import SyncBusyError
 
 logger = logging.getLogger("next_class.api")
@@ -27,7 +34,7 @@ class SchoolSetup(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
-class PushSetup(BaseModel):
+class NotificationSetup(BaseModel):
     token: str = Field(min_length=1, max_length=256)
     test: bool = False
 
@@ -41,6 +48,10 @@ class CloudSetup(BaseModel):
 class SettingsUpdate(BaseModel):
     sync_interval_days: int | None = Field(default=None, ge=1, le=3)
     push_enabled: bool | None = None
+
+
+class StartupUpdate(BaseModel):
+    enabled: bool
 
 
 def _container(request: Request) -> Container:
@@ -77,7 +88,7 @@ def _status_payload(container: Container) -> dict:
         "configured": bool(username and password),
         "school_configured": bool(username and password),
         "school_username": username,
-        "push_configured": bool(_credential(container, "pushplus_token")),
+        "push_configured": bool(_credential(container, "serverchan_sendkey")),
         **_cloud_fields(container),
         "last_sync_at": container.settings.get("last_success_sync_at"),
         "last_attempt_at": container.settings.get("last_attempt_sync_at"),
@@ -98,7 +109,7 @@ def _settings_payload(container: Container) -> dict:
             _credential(container, "school_username")
             and _credential(container, "school_password")
         ),
-        "push_configured": bool(_credential(container, "pushplus_token")),
+        "push_configured": bool(_credential(container, "serverchan_sendkey")),
         **_cloud_fields(container),
     }
 
@@ -227,6 +238,13 @@ def create_app(
         if not username:
             raise HTTPException(status_code=422, detail="学号不能为空")
         try:
+            active.credentials.get("school_username")
+        except CredentialError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="Windows 凭据管理器不可用，无法保存账号；请先修复后再登录",
+            ) from exc
+        try:
             result = await active.sync_service.sync(
                 "manual",
                 username=username,
@@ -246,14 +264,14 @@ def create_app(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         return {"status": result.status, "configured": True}
 
-    @app.post("/api/setup/pushplus")
-    def setup_pushplus(payload: PushSetup, request: Request) -> dict:
+    @app.post("/api/setup/notifications")
+    def setup_notifications(payload: NotificationSetup, request: Request) -> dict:
         active = _container(request)
         token = payload.token.strip()
         if not token:
-            raise HTTPException(status_code=422, detail="PushPlus token 不能为空")
+            raise HTTPException(status_code=422, detail="Server酱 SendKey 不能为空")
         try:
-            active.credentials.set("pushplus_token", token)
+            active.credentials.set("serverchan_sendkey", token)
         except CredentialError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         active.settings.set_bool("push_enabled", True)
@@ -261,7 +279,7 @@ def create_app(
             try:
                 active.notifier.send(
                     "下一节测试提醒",
-                    "如果你看到这条消息，微信提醒已经配置成功。",
+                    "如果你看到这条消息，Server酱 微信提醒已经配置成功。",
                 )
             except Exception as exc:
                 raise HTTPException(
@@ -349,6 +367,46 @@ def create_app(
             raise HTTPException(status_code=409, detail="同步正在进行中，请稍候") from exc
         return _sync_result(result)
 
+    @app.get("/api/system/startup")
+    def get_startup() -> dict:
+        return startup_status()
+
+    @app.put("/api/system/startup")
+    def update_startup(payload: StartupUpdate) -> dict:
+        try:
+            if payload.enabled:
+                enable_startup(PROJECT_ROOT)
+            else:
+                disable_startup()
+        except StartupError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return startup_status()
+
+    @app.get("/api/sync-runs")
+    def sync_runs(request: Request, limit: int = 5) -> dict:
+        active = _container(request)
+        return {
+            "runs": [
+                sync_run_payload(row)
+                for row in active.snapshots.recent_sync_runs(limit)
+            ]
+        }
+
+    @app.get("/api/diagnostics")
+    def diagnostics(request: Request) -> dict:
+        active = _container(request)
+        return build_report(
+            config=active.config,
+            credentials=active.credentials,
+            settings=active.settings,
+            snapshots=active.snapshots,
+        )
+
+    @app.post("/api/diagnostics/preflight")
+    def diagnostics_preflight(request: Request) -> dict:
+        active = _container(request)
+        return run_preflight(active.credentials)
+
     @app.get("/api/dashboard")
     def dashboard(request: Request) -> dict:
         return _dashboard_payload(_container(request))
@@ -370,11 +428,11 @@ def create_app(
     def test_notification(request: Request) -> dict:
         active = _container(request)
         if not active.notifier.is_configured():
-            raise HTTPException(status_code=400, detail="请先配置 PushPlus token")
+            raise HTTPException(status_code=400, detail="请先配置 Server酱 SendKey")
         try:
             active.notifier.send(
                 "下一节测试提醒",
-                "如果你看到这条消息，微信提醒已经配置成功。",
+                "如果你看到这条消息，Server酱 微信提醒已经配置成功。",
             )
         except Exception as exc:
             raise HTTPException(

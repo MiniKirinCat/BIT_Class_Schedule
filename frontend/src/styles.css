@@ -129,6 +129,14 @@ p {
   font-size: 13px;
 }
 
+.cloud-banner .ghost-button {
+  justify-self: start;
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
 .page {
   padding: 18px 18px 10px;
 }
@@ -1054,6 +1062,67 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
+}
+
+.preflight-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.preflight-grid {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft, var(--surface));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.preflight-grid .is-ok {
+  color: var(--primary);
+}
+
+.preflight-grid .is-alert {
+  color: var(--alert);
+}
+
+.diag-runs {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.diag-run {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.diag-run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.diag-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.diag-run .form-error {
+  margin-top: 6px;
 }
 
 .setup-shell {

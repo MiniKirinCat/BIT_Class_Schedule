@@ -187,6 +187,22 @@ class SnapshotRepo:
             row = conn.execute("SELECT * FROM sync_runs ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row else None
 
+    def recent_sync_runs(self, limit: int = 5) -> list[dict]:
+        limit = max(1, min(int(limit), 20))
+        with self.db.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM sync_runs ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def counts(self) -> dict[str, int]:
+        with self.db.connect() as conn:
+            row = conn.execute(
+                "SELECT (SELECT COUNT(*) FROM snapshots) AS snapshots, "
+                "(SELECT COUNT(*) FROM changes) AS changes"
+            ).fetchone()
+        return {"snapshots": int(row["snapshots"]), "changes": int(row["changes"])}
+
     def fail_interrupted_runs(self, finished_at: str) -> int:
         with self.db.connect() as conn:
             cur = conn.execute(

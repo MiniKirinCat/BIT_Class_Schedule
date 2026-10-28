@@ -1,9 +1,11 @@
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {
   formatCountdown,
+  formatDateLabel,
   periodTime,
   sessionKey,
   type TodayModel,
+  type UpcomingCourse,
 } from '../../lib/schedule';
 
 interface TodayFocusProps {
@@ -12,6 +14,7 @@ interface TodayFocusProps {
   now: Date;
   onOpenCourse: (course: CourseSession) => void;
   onGoWeek: () => void;
+  upcoming?: UpcomingCourse | null;
 }
 
 export function TodayFocus({
@@ -20,6 +23,7 @@ export function TodayFocus({
   now,
   onOpenCourse,
   onGoWeek,
+  upcoming = null,
 }: TodayFocusProps) {
   const { state } = model;
   const course =
@@ -66,9 +70,11 @@ export function TodayFocus({
             {state.kind === 'finished' ? '慢一点，也很好' : '留一点空白给今天'}
           </div>
           <p className="hero-meta">
-            {state.kind === 'finished'
-              ? '所有课程都已结束，可以安心安排自己的时间。'
-              : '今天没有排课，看看周课表或做点别的事。'}
+            {upcoming
+              ? `下一节：${formatDateLabel(upcoming.date)} ${periodTime(snapshot, upcoming.course.start_period).start} · ${upcoming.course.course_name}`
+              : state.kind === 'finished'
+                ? '所有课程都已结束，接下来几天暂时没有排课。'
+                : '今天没有排课，接下来几天也暂时没有排课。'}
           </p>
           <div className="hero-actions">
             <button type="button" className="button" onClick={onGoWeek}>

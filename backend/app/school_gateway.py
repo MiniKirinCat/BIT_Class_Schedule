@@ -19,6 +19,35 @@ class SchoolError(Exception):
         self.user_message = message
 
 
+def _login_error_message(exc: Exception) -> str:
+    text = str(exc).casefold()
+    if "短信" in text or "sms" in text:
+        return (
+            "统一身份认证要求短信验证码，当前版本不支持交互式验证。"
+            "请先在浏览器完成一次信任设备登录，或连接校园网后重试"
+        )
+    if "验证码" in text or "captcha" in text:
+        return "统一身份认证要求验证码，当前版本无法自动处理，请稍后重试"
+    if "频繁" in text or "429" in text:
+        return "统一身份认证请求过于频繁，请稍后再试"
+    if "超时" in text or "timeout" in text:
+        return "统一身份认证请求超时，请检查网络后重试"
+    if "无法连接" in text or "connection" in text:
+        return "无法连接统一身份认证，请检查校园网或 WebVPN"
+    return "登录教务系统失败，请检查账号密码，或确认当前网络能访问校园网/WebVPN"
+
+
+def _fetch_error_message(exc: Exception) -> str:
+    text = str(exc)
+    if "未返回本科课程表" in text:
+        return "教务系统未返回本科课表，请确认账号类型或稍后重试"
+    if "未返回当前学期" in text:
+        return "教务系统未返回当前学期，请确认账号类型或稍后重试"
+    if "未返回 JSON" in text or "接口" in text and "返回" in text:
+        return "教务系统返回了无法解析的数据，请稍后重试"
+    return "读取课表失败，请稍后重试"
+
+
 def _default_login(username: str, password: str):
     import bit_login
 
@@ -135,15 +164,15 @@ class BitSchoolGateway:
             session = self._login(username, password)
         except SchoolError:
             raise
-        except Exception:
-            raise SchoolError(
-                "LOGIN_FAILED", "登录教务系统失败，请检查账号密码或网络"
-            ) from None
+        except Exception as exc:
+            raise SchoolError("LOGIN_FAILED", _login_error_message(exc)) from None
 
         try:
             raw = self._fetch_courses(session)
-        except Exception:
-            raise SchoolError("FETCH_FAILED", "读取课表失败，请稍后重试") from None
+        except SchoolError:
+            raise
+        except Exception as exc:
+            raise SchoolError("FETCH_FAILED", _fetch_error_message(exc)) from None
 
         if not isinstance(raw, dict):
             raise SchoolError("DATA_ERROR", "教务系统返回的课表格式不正确")

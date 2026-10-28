@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from .cloud import CloudService, GistClient, SyncCloudPublisher
 from .config import AppConfig
 from .db import Database, SettingsRepo, SnapshotRepo
-from .notifier import PushPlusNotifier
+from .notifier import Notifier, ServerChanNotifier
 from .scheduler import SyncScheduler
 from .school_gateway import BitSchoolGateway
 from .security import CredentialStore
@@ -18,7 +18,7 @@ class Container:
     snapshots: SnapshotRepo
     credentials: CredentialStore
     gateway: BitSchoolGateway
-    notifier: PushPlusNotifier
+    notifier: Notifier
     cloud: CloudService
     publisher: CloudPublisher | None
     sync_service: SyncService
@@ -52,7 +52,7 @@ def build_container(
     notifier = (
         notifier
         if notifier is not None
-        else PushPlusNotifier(lambda: credentials.get("pushplus_token"))
+        else ServerChanNotifier(lambda: credentials.get("serverchan_sendkey"))
     )
     cloud = CloudService(
         config=config,

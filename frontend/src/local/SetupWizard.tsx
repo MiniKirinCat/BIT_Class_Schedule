@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { CloudSetupResult } from '../data/types';
+import type { CloudSetupResult, PreflightResult } from '../data/types';
 import { api, messageFromError } from '../data/local';
+import { PreflightSummary } from '../shared/PreflightSummary';
 
 interface SetupWizardProps {
   onComplete: () => void | Promise<void>;
   onCancel?: () => void;
   schoolApi?: (username: string, password: string) => Promise<unknown>;
   pushApi?: (token: string, test: boolean) => Promise<unknown>;
+  preflightApi?: () => Promise<PreflightResult>;
   cloudApi?: (payload: {
     token: string;
     pages_url: string;
@@ -23,7 +25,8 @@ export function SetupWizard({
   onComplete,
   onCancel,
   schoolApi = api.setupSchool,
-  pushApi = api.setupPush,
+  pushApi = api.setupNotifications,
+  preflightApi = api.preflight,
   cloudApi = api.setupCloud,
   cloudConfigured = false,
   cloudQrReady = false,
@@ -40,6 +43,9 @@ export function SetupWizard({
   const [qrVersion] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [preflightBusy, setPreflightBusy] = useState(false);
+  const [preflightError, setPreflightError] = useState('');
 
   useEffect(() => {
     setError('');
@@ -64,10 +70,22 @@ export function SetupWizard({
     }
   }
 
+  async function runPreflight() {
+    setPreflightBusy(true);
+    setPreflightError('');
+    try {
+      setPreflight(await preflightApi());
+    } catch (caught) {
+      setPreflightError(messageFromError(caught));
+    } finally {
+      setPreflightBusy(false);
+    }
+  }
+
   async function savePush(event: FormEvent) {
     event.preventDefault();
     if (!token.trim()) {
-      setError('请输入 PushPlus token，或点击跳过');
+      setError('请输入 Server酱 SendKey，或点击跳过');
       return;
     }
     setBusy(true);
@@ -164,7 +182,20 @@ export function SetupWizard({
             </div>
             <p className="form-hint">
               首次同步会读取当前学期课表；应用只监听 127.0.0.1，不会暴露到局域网。
+              登录前可以先做一次环境自检。
             </p>
+            <div className="preflight-box">
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={busy || preflightBusy}
+                onClick={() => void runPreflight()}
+              >
+                {preflightBusy ? '正在检查…' : '运行环境自检'}
+              </button>
+              {preflightError && <p className="form-error">{preflightError}</p>}
+              {preflight && <PreflightSummary result={preflight} />}
+            </div>
           </form>
         )}
 
@@ -173,18 +204,19 @@ export function SetupWizard({
             <div>
               <h1 className="setup-title">微信提醒</h1>
               <p className="setup-subtitle">
-                可选。配置 PushPlus 后，课表变动会合并成一条微信消息发给你。
+                可选。配置 Server酱 Turbo 后，课表变动会合并成一条微信消息发给你。
+                免费会员每天 5 条，测试消息也会占用额度。
               </p>
             </div>
             <label className="form-field">
-              <span className="form-label">PushPlus token</span>
+              <span className="form-label">Server酱 SendKey</span>
               <input
                 className="input"
                 type="password"
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
                 autoComplete="off"
-                placeholder="粘贴 PushPlus token"
+                placeholder="粘贴 SCT 开头的 SendKey"
               />
             </label>
             {error && <p className="form-error">{error}</p>}
@@ -202,7 +234,10 @@ export function SetupWizard({
               </button>
             </div>
             <p className="form-hint">
-              测试提醒会立即发到微信。之后可以随时在设置页替换 token。
+              <a href="https://sct.ftqq.com/" target="_blank" rel="noreferrer">
+                获取 Server酱 SendKey
+              </a>
+              。测试提醒会立即发到微信，之后可以随时在设置页替换 SendKey。
             </p>
           </form>
         )}

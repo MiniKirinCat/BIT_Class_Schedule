@@ -175,6 +175,26 @@ export function sessionEnd(
   return dateTimeFor(date, periodTime(snapshot, session.end_period).end);
 }
 
+export interface UpcomingCourse {
+  date: string;
+  course: CourseSession;
+}
+
+export function nextCourseAfter(
+  snapshot: ScheduleSnapshot,
+  date: string,
+  maxDays = 28,
+): UpcomingCourse | null {
+  for (let offset = 1; offset <= maxDays; offset += 1) {
+    const nextDate = addDays(date, offset);
+    const sessions = coursesForDate(snapshot, nextDate);
+    if (sessions.length > 0) {
+      return { date: nextDate, course: sessions[0] };
+    }
+  }
+  return null;
+}
+
 export function buildTodayModel(
   snapshot: ScheduleSnapshot,
   now: Date,

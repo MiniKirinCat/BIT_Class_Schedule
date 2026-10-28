@@ -2,9 +2,11 @@ import { Fragment } from 'react';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {
   formatCountdown,
+  formatDateLabel,
   periodTime,
   sessionKey,
   type TodayModel,
+  type UpcomingCourse,
 } from '../../lib/schedule';
 
 interface TodayTimelineProps {
@@ -12,6 +14,8 @@ interface TodayTimelineProps {
   model: TodayModel;
   now: Date;
   onOpenCourse: (course: CourseSession) => void;
+  onGoWeek: () => void;
+  upcoming?: UpcomingCourse | null;
 }
 
 export function TodayTimeline({
@@ -19,6 +23,8 @@ export function TodayTimeline({
   model,
   now,
   onOpenCourse,
+  onGoWeek,
+  upcoming = null,
 }: TodayTimelineProps) {
   const { state } = model;
   const nextCourse =
@@ -58,7 +64,14 @@ export function TodayTimeline({
       {model.sessions.length === 0 ? (
         <div className="empty-state">
           <strong>今天没有课</strong>
-          <span>去周课表看看这周的安排。</span>
+          <span>
+            {upcoming
+              ? `下一节：${formatDateLabel(upcoming.date)} ${periodTime(snapshot, upcoming.course.start_period).start} · ${upcoming.course.course_name}`
+              : '接下来几天暂时没有排课。'}
+          </span>
+          <button type="button" className="button" onClick={onGoWeek}>
+            查看周课表
+          </button>
         </div>
       ) : (
         <div className="timeline">

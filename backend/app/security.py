@@ -15,7 +15,7 @@ _URL_USERINFO = re.compile(r"(?i)(https?://)[^/\s]+@")
 _COOKIE = re.compile(r"(?i)(cookie\s*:\s*)[^\n]+")
 _AUTH = re.compile(r"(?i)(authorization\s*:\s*)[^\n]+")
 _SECRET_KEYS = (
-    r"school_password|school_username|pushplus_token|github_token|snapshot_key|"
+    r"school_password|school_username|pushplus_token|serverchan_sendkey|sendkey|github_token|snapshot_key|"
     r"access_token|refresh_token|auth_token|client_secret|api_key|"
     r"x-api-key|api-key|x-auth-token|auth-token|access-token|refresh-token|client-secret|"
     r"proxy-authorization|set-cookie|session_id|sessionid|"

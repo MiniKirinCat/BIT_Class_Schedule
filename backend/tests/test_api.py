@@ -246,18 +246,18 @@ def test_settings_validation_and_update(tmp_path):
         assert client.get("/api/settings").json()["sync_interval_days"] == 3
 
 
-def test_pushplus_setup_and_test_notification(tmp_path):
+def test_serverchan_setup_and_test_notification(tmp_path):
     app, credentials, notifier = make_app(tmp_path, FakeGateway())
     notifier.configured = True
 
     with TestClient(app) as client:
         response = client.post(
-            "/api/setup/pushplus",
-            json={"token": "  push-token  ", "test": True},
+            "/api/setup/notifications",
+            json={"token": "  SCTpush-token  ", "test": True},
         )
         assert response.status_code == 200
         assert response.json() == {"configured": True, "tested": True}
-        assert credentials.get("pushplus_token") == "push-token"
+        assert credentials.get("serverchan_sendkey") == "SCTpush-token"
         assert app.state.container.settings.get_bool("push_enabled", False) is True
         assert notifier.messages[0][0] == "下一节测试提醒"
 
@@ -269,11 +269,11 @@ def test_pushplus_setup_and_test_notification(tmp_path):
         assert tested.json() == {"status": "sent"}
         assert len(notifier.messages) == 2
 
-        blank = client.post("/api/setup/pushplus", json={"token": "   "})
+        blank = client.post("/api/setup/notifications", json={"token": "   "})
         assert blank.status_code == 422
 
 
-def test_pushplus_setup_failure_keeps_token_and_redacts_error(tmp_path):
+def test_serverchan_setup_failure_keeps_key_and_redacts_error(tmp_path):
     app, credentials, notifier = make_app(tmp_path, FakeGateway())
     notifier.configured = True
     notifier.fail = True
@@ -281,8 +281,8 @@ def test_pushplus_setup_failure_keeps_token_and_redacts_error(tmp_path):
 
     with TestClient(app) as client:
         response = client.post(
-            "/api/setup/pushplus",
-            json={"token": "push-token", "test": True},
+            "/api/setup/notifications",
+            json={"token": "SCTpush-token", "test": True},
         )
         assert response.status_code == 502
         detail = response.json()["detail"]
@@ -290,8 +290,8 @@ def test_pushplus_setup_failure_keeps_token_and_redacts_error(tmp_path):
         assert "token=[REDACTED]" in detail
 
         # The token is saved before the optional test send, so a later retry
-        # only needs to fix the network/PushPlus side.
-        assert credentials.get("pushplus_token") == "push-token"
+        # only needs to fix the network/Server酱 side.
+        assert credentials.get("serverchan_sendkey") == "SCTpush-token"
         assert app.state.container.settings.get_bool("push_enabled", False) is True
 
 
@@ -768,3 +768,81 @@ def test_lifespan_marks_interrupted_runs_failed(tmp_path):
     assert run is not None
     assert run["status"] == "failed"
     assert run["error_code"] == "INTERRUPTED"
+
+
+def test_sync_runs_and_diagnostics_are_sanitized(tmp_path, monkeypatch):
+    app, credentials, _ = make_app(tmp_path, FakeGateway())
+    credentials.set("school_username", "20250001")
+    credentials.set("serverchan_sendkey", "SCTsecret-key")
+    with TestClient(app) as client:
+        active = app.state.container
+        active.snapshots.record_sync_run(
+            trigger="manual",
+            started_at="2026-10-27T10:00:00+08:00",
+            finished_at="2026-10-27T10:00:04+08:00",
+            status="failed",
+            error_code="LOGIN_FAILED",
+            error_message="password=secret-password",
+            course_count=0,
+            change_count=0,
+        )
+        runs = client.get("/api/sync-runs?limit=1")
+        assert runs.status_code == 200
+        assert runs.json()["runs"][0]["duration_seconds"] == 4
+        assert runs.json()["runs"][0]["error_message"] == "password=[REDACTED]"
+
+        monkeypatch.setattr(
+            "app.api.run_preflight",
+            lambda credentials: {
+                "checked_at": "2026-10-27T10:00:00+08:00",
+                "keyring": {"available": True, "error": None},
+                "network": {
+                    "sso": {"reachable": True, "status": 200, "error": None},
+                    "webvpn": {"reachable": True, "status": 200, "error": None},
+                    "suggested": "auto",
+                },
+            },
+        )
+        preflight = client.post("/api/diagnostics/preflight")
+        assert preflight.status_code == 200
+        assert preflight.json()["keyring"]["available"] is True
+
+        report = client.get("/api/diagnostics")
+        assert report.status_code == 200
+        body = report.json()
+        text = str(body)
+        assert "20250001" not in text
+        assert "SCTsecret-key" not in text
+        assert "secret-password" not in text
+        assert body["counts"]["snapshots"] == 0
+        assert body["sync_runs"][0]["error_code"] == "LOGIN_FAILED"
+
+
+def test_startup_toggle(tmp_path, monkeypatch):
+    app, _, _ = make_app(tmp_path, FakeGateway())
+    state = {"enabled": False}
+
+    monkeypatch.setattr(
+        "app.api.startup_status",
+        lambda: {"supported": True, "enabled": state["enabled"]},
+    )
+    monkeypatch.setattr(
+        "app.api.enable_startup",
+        lambda root: state.update(enabled=True),
+    )
+    monkeypatch.setattr(
+        "app.api.disable_startup",
+        lambda: state.update(enabled=False),
+    )
+
+    with TestClient(app) as client:
+        assert client.get("/api/system/startup").json() == {
+            "supported": True,
+            "enabled": False,
+        }
+        enabled = client.put("/api/system/startup", json={"enabled": True})
+        assert enabled.status_code == 200
+        assert enabled.json()["enabled"] is True
+        disabled = client.put("/api/system/startup", json={"enabled": False})
+        assert disabled.status_code == 200
+        assert disabled.json()["enabled"] is False

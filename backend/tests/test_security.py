@@ -39,11 +39,18 @@ def test_redact_removes_queries_headers_and_secret_pairs():
         "GET https://example.com/path?token=abc&x=1\n"
         "Cookie: SESSION=secret-cookie\n"
         "Authorization: Bearer secret-token\n"
-        "password=hunter2 school_password=xyz"
+        "password=hunter2 school_password=xyz serverchan_sendkey=SCTsecret"
     )
     cleaned = redact(text)
 
-    for secret in ("abc", "secret-cookie", "secret-token", "hunter2", "xyz"):
+    for secret in (
+        "abc",
+        "secret-cookie",
+        "secret-token",
+        "hunter2",
+        "xyz",
+        "SCTsecret",
+    ):
         assert secret not in cleaned
     assert "https://example.com/path?[REDACTED]" in cleaned
 

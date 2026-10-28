@@ -46,6 +46,7 @@ export function CloudApp() {
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [lastPullAt, setLastPullAt] = useState<string | null>(null);
   const [warning, setWarning] = useState('');
   const [error, setError] = useState<CloudLoadError | null>(null);
   const [page, setPage] = useState<PageKey>('today');
@@ -92,6 +93,7 @@ export function CloudApp() {
     } finally {
       loadingRef.current = false;
       lastLoadedAt.current = Date.now();
+      setLastPullAt(new Date().toISOString());
       setLoading(false);
       setInitialized(true);
     }
@@ -176,6 +178,7 @@ export function CloudApp() {
     setError(null);
     setFromCache(false);
     setCachedAt(null);
+    setLastPullAt(null);
     setWarning('');
     setPage('today');
     setLoading(false);
@@ -254,8 +257,18 @@ export function CloudApp() {
     <div className="cloud-banner" role="status">
       <strong>正在显示缓存快照</strong>
       <span>
-        {warning || '无法连接云端。'} 最后同步于 {formatDateTime(snapshot.synced_at)}
+        {warning || '无法连接云端。'} 快照同步于 {formatDateTime(snapshot.synced_at)}
+        {cachedAt ? ` · 本机缓存于 ${formatDateTime(cachedAt)}` : ''}
+        {lastPullAt ? ` · 本次拉取 ${formatDateTime(lastPullAt)}` : ''}
       </span>
+      <button
+        type="button"
+        className="ghost-button"
+        disabled={loading}
+        onClick={refresh}
+      >
+        {loading ? '正在拉取…' : '重试拉取'}
+      </button>
     </div>
   ) : null;
 
@@ -267,6 +280,7 @@ export function CloudApp() {
         snapshot={snapshot}
         fromCache={fromCache}
         cachedAt={cachedAt}
+        lastPullAt={lastPullAt}
         theme={theme}
         todayLayout={todayLayout}
         weekLayout={weekLayout}

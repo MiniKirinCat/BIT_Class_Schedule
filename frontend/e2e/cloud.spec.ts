@@ -37,7 +37,7 @@ function fixtureSnapshot() {
   });
   return {
     schema_version: 1,
-    app_version: '0.1.0',
+    app_version: '1.1.0',
     synced_at: new Date().toISOString(),
     sync_interval_days: 1,
     term: '2026-2027-1',

@@ -1,6 +1,6 @@
 # 下一节
 
-北京理工大学个人课表工具：从教务系统自动同步课表，打开就能看到今天和下一节；课表变化时通过 PushPlus 发一条微信提醒；电脑关机时，手机仍可通过 GitHub Pages 上的只读 PWA 查看最后一次加密快照。
+北京理工大学个人课表工具：从教务系统自动同步课表，打开就能看到今天和下一节；课表变化时通过 Server酱 Turbo 发一条微信提醒；电脑关机时，手机仍可通过 GitHub Pages 上的只读 PWA 查看最后一次加密快照。
 
 这是单用户、本地优先的工具。本地服务只监听 `127.0.0.1`，不开放局域网；课表和设置存本机 SQLite，密码、token 只进 Windows 凭据管理器。云端 Gist 只保存 AES-256-GCM 密文，手机在浏览器内解密。
 
@@ -40,10 +40,30 @@ scripts\stop.ps1
 
 如果 PowerShell 执行策略阻止脚本，改用 `powershell -ExecutionPolicy Bypass -File scripts\start.ps1`（停止同理）。停止脚本只会结束 `data\runtime.json` 指向且命令行匹配本应用的进程，不会杀占用端口的其他程序。
 
+## 托盘与开机自启
+
+日常使用建议从托盘运行，不必每次开一个控制台窗口：
+
+```powershell
+.venv\Scripts\pythonw.exe scripts\tray.py
+```
+
+托盘图标提供：
+
+- **打开下一节**：打开本地页面（双击图标同效）；
+- **立即同步**：触发一次手动同步；
+- **状态行**：显示上次同步时间或同步异常；
+- **查看日志**：打开 `data\app.log`；
+- **退出并停止服务**：同时结束本应用启动的本地服务，不需要再运行停止脚本。
+
+托盘启动时会复用已经健康的本地实例；没有实例时才在后台启动一个隐藏窗口的服务。重复运行托盘不会启动第二份，只会打开现有页面。
+
+在 **设置 → 启动与退出 → 开启开机自启** 会在 Windows 启动文件夹创建 `下一节.lnk`，登录后自动运行托盘；再次点击即可关闭。该操作写入当前用户目录，不需要管理员权限。
+
 ## 首次配置
 
 1. 输入学号和密码，点击“连接并同步”。密码只发给本机服务，再写入 Windows 凭据管理器。
-2. 可选填 PushPlus token 并发送测试提醒；也可以跳过。
+2. 可选填 Server酱 Turbo SendKey 并发送测试提醒；也可以跳过。
 3. 可选配置云端快照：填写 GitHub token 和 Pages 地址，应用会自动创建 secret Gist、加密发布当前课表并生成手机二维码；也可以跳过。
 4. 完成后进入今天页。布局按钮可切换三种今天布局；周课表页可切换整周/单日。
 
@@ -90,10 +110,30 @@ scripts\stop.ps1
 - 电脑关机或应用未运行时不会同步；页面会显示最后同步时间。
 - 教务系统返回空课表时，第一次保留旧快照并提醒；连续第二次才按空课表更新。
 
+## 微信提醒
+
+提醒通过 [Server酱 Turbo](https://sct.ftqq.com/) 发送，替代了需要付费实名认证的 PushPlus：
+
+1. 用微信登录 Server酱，按页面提示获取 SendKey（形如 `SCT...`），并关注其公众号。
+2. 在首次配置的“提醒”步骤，或 **设置 → Server酱** 中粘贴 SendKey；保存时可勾选发送测试提醒。
+3. 课表变动会合并成一条消息，包含变动摘要和同步失败原因；通知失败不会影响课表数据，错误会显示在设置页和状态徽标中。
+4. 免费版每天只能发少量消息（当前为 5 条/天），务必保留测试和变动提醒的额度；Server酱的配额与实名政策以其页面为准。
+5. SendKey 只保存在 Windows 凭据管理器，日志和诊断报告中会被脱敏。
+
+## 诊断与排错
+
+**设置 → 诊断** 可以：
+
+- **运行环境预检**：检查凭据管理器、统一身份认证和 WebVPN 的连通性，并给出建议的网络模式（校园网 / WebVPN / 自动）。
+- **复制诊断报告**：生成脱敏后的版本、平台、同步状态、数据量和最近同步记录文本，便于排查；不包含学号、密码、SendKey、GitHub token 或课表内容。
+- **查看同步记录**：最近 5 次同步的时间、触发方式、耗时、结果和云端发布状态。
+
+常见错误会给出可操作提示，例如短信验证码、登录频率限制、超时、未找到当前学期或课表解析失败。
+
 ## 隐私与安全
 
 - 本地服务只绑定 `127.0.0.1`，无 CORS、无 LAN/PIN。
-- 学号密码、PushPlus token、GitHub token、快照密钥都存在 Windows 凭据管理器；SQLite、日志、前端产物中不保存这些值。
+- 学号密码、Server酱 SendKey、GitHub token、快照密钥都存在 Windows 凭据管理器；SQLite、日志、前端产物中不保存这些值。
 - 日志轮转 1 MB × 3，写入前对密码、token、Cookie、Authorization、URL 查询参数脱敏。
 - 课表数据在 `data\next_class.db`；日志在 `data\app.log`。
 - Gist 只保存密文。GitHub Pages 上只有静态代码，不含 token、账号或密钥。
@@ -142,7 +182,7 @@ npm run e2e
 
 ## 主要依赖
 
-- 后端：FastAPI、Uvicorn、Pydantic、httpx、keyring、cryptography、qrcode、pytest、pytest-asyncio、BIT-Login-Python。
+- 后端：FastAPI、Uvicorn、Pydantic、httpx、keyring、cryptography、qrcode、pystray、Pillow、pytest、pytest-asyncio、BIT-Login-Python。
 - 前端：React、Vite、TypeScript、Vitest、React Testing Library、Playwright。
 - 版本由 `backend/requirements.txt` 和 `frontend/package-lock.json` 锁定。
 
@@ -155,7 +195,7 @@ npm run e2e
 ## 已知限制
 
 - 需要校园网或 WebVPN；遇到短信验证码时 V1 不支持交互式验证。
-- GitHub 可达性、PushPlus 配额、教务系统接口变更都可能影响使用。
+- GitHub 可达性、Server酱 配额与实名政策、教务系统接口变更都可能影响使用。
 - 电脑关机期间不会产生新的同步或提醒；手机端只读，没有后台同步或推送。
 - 云端 PWA 没有 Service Worker（按设计不做离线应用壳）；断网时只有在页面已加载的情况下才能使用本机缓存。
 - GitHub Pages 必须由仓库管理员手动开启一次（Actions token 无权创建 Pages）；开启后后续部署自动。Pages 地址需要手动填入设置。

@@ -136,6 +136,13 @@ describe('Today layouts', () => {
     expect(screen.getByText('今天没课')).toBeInTheDocument();
   });
 
+  it('shows the next course when today has no classes', () => {
+    renderToday('focus', {
+      now: new Date('2026-10-25T09:00:00+08:00'),
+    });
+    expect(screen.getByText(/下一节：.*高等数学/)).toBeInTheDocument();
+  });
+
   it('marks stale snapshots in the header badge', () => {
     render(
       <StaleBadge

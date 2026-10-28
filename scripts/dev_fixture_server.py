@@ -5,7 +5,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,7 +91,7 @@ def fixture_snapshot():
     ]
     return {
         "schema_version": 1,
-        "app_version": "0.1.0",
+        "app_version": "1.1.0",
         "synced_at": now.isoformat(timespec="seconds"),
         "sync_interval_days": 1,
         "term": "2026-2027-1",
@@ -141,7 +141,7 @@ def status():
         "last_error": None,
         "notification_error": None,
         "cloud_status": "skipped",
-        "version": "0.1.0",
+        "version": "1.1.0",
     }
 
 
@@ -164,6 +164,88 @@ def settings():
 @app.get("/api/dashboard")
 def dashboard():
     return fixture_snapshot()
+
+
+@app.post("/api/setup/notifications")
+def setup_notifications(payload: dict = Body(...)):
+    return {"configured": True, "tested": bool(payload.get("test"))}
+
+
+@app.get("/api/system/startup")
+def get_startup():
+    return {"supported": True, "enabled": False}
+
+
+@app.put("/api/system/startup")
+def update_startup(payload: dict = Body(...)):
+    return {"supported": True, "enabled": bool(payload.get("enabled"))}
+
+
+@app.get("/api/sync-runs")
+def sync_runs(limit: int = 5):
+    now = datetime.now(TZ)
+    return {
+        "runs": [
+            {
+                "id": 1,
+                "trigger": "startup",
+                "started_at": (now - timedelta(minutes=3)).isoformat(timespec="seconds"),
+                "finished_at": now.isoformat(timespec="seconds"),
+                "duration_seconds": 180,
+                "status": "success",
+                "error_code": None,
+                "error_message": None,
+                "term": "2026-2027-1",
+                "course_count": 4,
+                "change_count": 0,
+                "cloud_publish_status": "skipped",
+            }
+        ][:limit]
+    }
+
+
+@app.get("/api/diagnostics")
+def diagnostics():
+    now = datetime.now(TZ)
+    return {
+        "format": "next-class-diagnostics",
+        "version": 1,
+        "generated_at": now.isoformat(timespec="seconds"),
+        "app_version": "1.1.0",
+        "platform": {
+            "system": "Windows",
+            "release": "fixture",
+            "machine": "AMD64",
+            "python": "3.13",
+        },
+        "keyring": {"available": True, "error": None},
+        "settings": {
+            "sync_interval_days": 1,
+            "notifications_enabled": False,
+            "notifications_configured": False,
+            "cloud_configured": False,
+            "cloud_last_publish_at": None,
+            "cloud_last_error": None,
+            "notification_last_error": None,
+        },
+        "counts": {"snapshots": 1, "changes": 2},
+        "last_sync": None,
+        "sync_runs": [],
+        "note": "fixture diagnostics",
+    }
+
+
+@app.post("/api/diagnostics/preflight")
+def preflight():
+    return {
+        "checked_at": datetime.now(TZ).isoformat(timespec="seconds"),
+        "keyring": {"available": True, "error": None},
+        "network": {
+            "sso": {"reachable": True, "status": 200, "error": None},
+            "webvpn": {"reachable": True, "status": 200, "error": None},
+            "suggested": "auto",
+        },
+    }
 
 
 if DIST.is_dir():

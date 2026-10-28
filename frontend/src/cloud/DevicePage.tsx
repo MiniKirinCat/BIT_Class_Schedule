@@ -9,6 +9,7 @@ interface DevicePageProps {
   snapshot: ScheduleSnapshot;
   fromCache: boolean;
   cachedAt: string | null;
+  lastPullAt: string | null;
   theme: ThemeName;
   todayLayout: TodayLayout;
   weekLayout: WeekLayout;
@@ -25,6 +26,7 @@ export function DevicePage({
   snapshot,
   fromCache,
   cachedAt,
+  lastPullAt,
   theme,
   todayLayout,
   weekLayout,
@@ -74,6 +76,12 @@ export function DevicePage({
               : '云端最新快照'}
           </span>
         </div>
+        <div className="settings-row">
+          <span>上次拉取</span>
+          <span className="settings-value">
+            {lastPullAt ? formatDateTime(lastPullAt) : '—'}
+          </span>
+        </div>
         <div className="form-actions">
           <button
             type="button"
@@ -86,6 +94,7 @@ export function DevicePage({
         </div>
         <p className="form-hint">
           云端页面没有后台同步；电脑端发布新快照后，手动拉取或重新打开即可更新。
+          拉取失败时会继续显示本机缓存，密钥错误则不会回退到旧数据。
         </p>
       </section>
 

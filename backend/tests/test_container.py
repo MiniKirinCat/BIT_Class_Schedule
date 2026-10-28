@@ -1,7 +1,7 @@
 from app.config import AppConfig
 from app.container import build_container
 from app.db import Database, SettingsRepo, SnapshotRepo
-from app.notifier import PushPlusNotifier
+from app.notifier import ServerChanNotifier
 from app.scheduler import SyncScheduler
 from app.school_gateway import BitSchoolGateway
 from app.security import CredentialStore
@@ -67,7 +67,7 @@ def test_container_builds_default_dependencies(tmp_path):
     try:
         assert isinstance(container.credentials, CredentialStore)
         assert isinstance(container.gateway, BitSchoolGateway)
-        assert isinstance(container.notifier, PushPlusNotifier)
+        assert isinstance(container.notifier, ServerChanNotifier)
         assert isinstance(container.scheduler, SyncScheduler)
         assert container.sync_service._credentials is container.credentials
         assert container.sync_service._gateway is container.gateway
@@ -112,7 +112,7 @@ def test_container_passes_through_injected_dependencies(tmp_path):
 
 def test_container_respects_falsy_but_valid_credentials(tmp_path):
     config = AppConfig(data_dir=tmp_path, scheduler_enabled=False)
-    credentials = FalsyCredentials(pushplus_token="token-123")
+    credentials = FalsyCredentials(serverchan_sendkey="SCTtoken-123")
     assert not credentials
 
     container = build_container(config, credentials=credentials)

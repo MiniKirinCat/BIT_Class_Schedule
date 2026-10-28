@@ -64,7 +64,31 @@ describe('SetupWizard', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
-  it('saves and tests a PushPlus token', async () => {
+  it('runs the environment preflight before login', async () => {
+    const preflightApi = vi.fn().mockResolvedValue({
+      checked_at: '2026-10-27T10:00:00+08:00',
+      keyring: { available: true, error: null },
+      network: {
+        sso: { reachable: true, status: 200, error: null },
+        webvpn: { reachable: false, status: null, error: 'blocked' },
+        suggested: 'campus',
+      },
+    });
+    render(
+      <SetupWizard
+        onComplete={vi.fn()}
+        schoolApi={vi.fn()}
+        pushApi={vi.fn()}
+        preflightApi={preflightApi}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '运行环境自检' }));
+    expect(await screen.findByText(/Windows 凭据管理器：可用/)).toBeInTheDocument();
+    expect(screen.getByText(/统一身份认证：可访问/)).toBeInTheDocument();
+    expect(screen.getByText(/WebVPN：不可访问/)).toBeInTheDocument();
+  });
+
+  it('saves and tests a Server酱 SendKey', async () => {
     const pushApi = vi.fn().mockResolvedValue({ configured: true, tested: true });
     const onComplete = vi.fn();
     render(
@@ -79,10 +103,10 @@ describe('SetupWizard', () => {
     await userEvent.type(screen.getByLabelText('密码'), 'pw');
     await userEvent.click(screen.getByRole('button', { name: '连接并同步' }));
     await screen.findByText('微信提醒');
-    await userEvent.type(screen.getByLabelText('PushPlus token'), 'push-token');
+    await userEvent.type(screen.getByLabelText('Server酱 SendKey'), 'SCTpush-token');
     await userEvent.click(screen.getByRole('button', { name: '保存并测试' }));
 
-    expect(pushApi).toHaveBeenCalledWith('push-token', true);
+    expect(pushApi).toHaveBeenCalledWith('SCTpush-token', true);
     expect(await screen.findByText('云端只读快照')).toBeInTheDocument();
   });
 

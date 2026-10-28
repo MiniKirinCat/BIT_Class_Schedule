@@ -2,7 +2,11 @@ import type {
   AppSettings,
   AppStatus,
   CloudSetupResult,
+  DiagnosticsReport,
+  PreflightResult,
+  StartupStatus,
   SyncResult,
+  SyncRun,
 } from './types';
 
 export class ApiError extends Error {
@@ -59,14 +63,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
-  setupPush: (token: string, test: boolean) =>
-    request<{ configured: boolean; tested: boolean }>('/api/setup/pushplus', {
+  setupNotifications: (token: string, test: boolean) =>
+    request<{ configured: boolean; tested: boolean }>('/api/setup/notifications', {
       method: 'POST',
       body: JSON.stringify({ token, test }),
     }),
   sync: () => request<SyncResult>('/api/sync', { method: 'POST' }),
   testNotification: () =>
     request<{ status: string }>('/api/notifications/test', { method: 'POST' }),
+  syncRuns: (limit = 5) =>
+    request<{ runs: SyncRun[] }>(`/api/sync-runs?limit=${limit}`),
+  diagnostics: () => request<DiagnosticsReport>('/api/diagnostics'),
+  preflight: () =>
+    request<PreflightResult>('/api/diagnostics/preflight', { method: 'POST' }),
+  startup: () => request<StartupStatus>('/api/system/startup'),
+  updateStartup: (enabled: boolean) =>
+    request<StartupStatus>('/api/system/startup', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
   setupCloud: (payload: { token: string; pages_url: string; gist_id?: string }) =>
     request<CloudSetupResult>('/api/setup/cloud', {
       method: 'POST',

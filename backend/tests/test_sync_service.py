@@ -494,7 +494,7 @@ def test_publisher_payload_shape_includes_changes_before_and_after(tmp_path):
 
     payload = publisher.payloads[0]
     assert payload["schema_version"] == 1
-    assert payload["app_version"] == "0.1.0"
+    assert payload["app_version"] == "1.1.0"
     assert payload["synced_at"] == NOW.isoformat(timespec="seconds")
     assert payload["sync_interval_days"] == 1
     assert payload["term"] == "2025-2026-1"

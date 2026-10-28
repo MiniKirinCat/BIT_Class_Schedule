@@ -1,5 +1,9 @@
 import type { CourseSession, ScheduleSnapshot, TodayLayout } from '../types';
-import { buildTodayModel, formatDateLabel } from '../lib/schedule';
+import {
+  buildTodayModel,
+  formatDateLabel,
+  nextCourseAfter,
+} from '../lib/schedule';
 import { ChangeBanner } from './today/ChangeBanner';
 import { TodayCompact } from './today/TodayCompact';
 import { TodayFocus } from './today/TodayFocus';
@@ -27,6 +31,10 @@ export function TodayPage({
   onGoWeek,
 }: TodayPageProps) {
   const model = buildTodayModel(snapshot, now);
+  const upcoming =
+    model.state.kind === 'empty' || model.state.kind === 'finished'
+      ? nextCourseAfter(snapshot, model.date)
+      : null;
 
   return (
     <section className="today-page">
@@ -54,6 +62,7 @@ export function TodayPage({
           now={now}
           onOpenCourse={onOpenCourse}
           onGoWeek={onGoWeek}
+          upcoming={upcoming}
         />
       )}
       {layout === 'timeline' && (
@@ -62,6 +71,8 @@ export function TodayPage({
           model={model}
           now={now}
           onOpenCourse={onOpenCourse}
+          onGoWeek={onGoWeek}
+          upcoming={upcoming}
         />
       )}
       {layout === 'compact' && (
@@ -71,6 +82,8 @@ export function TodayPage({
           unreadCount={unreadCount}
           onOpenCourse={onOpenCourse}
           onOpenChanges={onOpenChanges}
+          onGoWeek={onGoWeek}
+          upcoming={upcoming}
         />
       )}
     </section>

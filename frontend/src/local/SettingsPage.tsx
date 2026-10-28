@@ -1,9 +1,37 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { ThemeName } from '../types';
-import type { AppSettings, AppStatus } from '../data/types';
+import type {
+  AppSettings,
+  AppStatus,
+  PreflightResult,
+  StartupStatus,
+  SyncRun,
+} from '../data/types';
 import { api, messageFromError } from '../data/local';
 import { formatDateTime } from '../lib/schedule';
+import { PreflightSummary } from '../shared/PreflightSummary';
 import { ThemePicker } from '../shared/ThemePicker';
+
+const RUN_STATUS_LABELS: Record<string, string> = {
+  success: '正常',
+  failed: '失败',
+  anomaly: '异常',
+  running: '同步中',
+};
+
+const TRIGGER_LABELS: Record<string, string> = {
+  manual: '手动',
+  startup: '启动',
+  scheduled: '定时',
+};
+
+function formatDuration(seconds: number | null): string {
+  if (seconds == null) return '—';
+  if (seconds < 60) return `${seconds} 秒`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分`;
+}
 
 interface SettingsPageProps {
   status: AppStatus;
@@ -36,12 +64,90 @@ export function SettingsPage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [runs, setRuns] = useState<SyncRun[]>([]);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [diagBusy, setDiagBusy] = useState(false);
+  const [diagError, setDiagError] = useState('');
+  const [diagNotice, setDiagNotice] = useState('');
+  const [startup, setStartup] = useState<StartupStatus | null>(null);
+  const [startupBusy, setStartupBusy] = useState(false);
+  const [startupError, setStartupError] = useState('');
 
   useEffect(() => {
     api.settings()
       .then(setSettings)
       .catch((caught) => setError(messageFromError(caught)));
   }, []);
+
+  useEffect(() => {
+    api.syncRuns(5)
+      .then((result) => setRuns(result.runs))
+      .catch((caught) => setDiagError(messageFromError(caught)));
+  }, [status.last_attempt_at]);
+
+  useEffect(() => {
+    api.startup()
+      .then(setStartup)
+      .catch((caught) => setStartupError(messageFromError(caught)));
+  }, []);
+
+  async function toggleStartup() {
+    if (!startup?.supported) return;
+    setStartupBusy(true);
+    setStartupError('');
+    try {
+      setStartup(await api.updateStartup(!startup.enabled));
+    } catch (caught) {
+      setStartupError(messageFromError(caught));
+    } finally {
+      setStartupBusy(false);
+    }
+  }
+
+  async function reloadRuns() {
+    setDiagBusy(true);
+    setDiagError('');
+    setDiagNotice('');
+    try {
+      setRuns((await api.syncRuns(5)).runs);
+    } catch (caught) {
+      setDiagError(messageFromError(caught));
+    } finally {
+      setDiagBusy(false);
+    }
+  }
+
+  async function runPreflight() {
+    setDiagBusy(true);
+    setDiagError('');
+    setDiagNotice('');
+    try {
+      setPreflight(await api.preflight());
+    } catch (caught) {
+      setDiagError(messageFromError(caught));
+    } finally {
+      setDiagBusy(false);
+    }
+  }
+
+  async function copyDiagnostics() {
+    setDiagBusy(true);
+    setDiagError('');
+    setDiagNotice('');
+    try {
+      const report = await api.diagnostics();
+      const text = JSON.stringify(report, null, 2);
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('当前浏览器不支持自动复制，请换用 Chrome/Edge 或手动查看日志');
+      }
+      await navigator.clipboard.writeText(text);
+      setDiagNotice('诊断信息已复制到剪贴板，未上传到任何服务器');
+    } catch (caught) {
+      setDiagError(messageFromError(caught));
+    } finally {
+      setDiagBusy(false);
+    }
+  }
 
   async function patch(payload: { sync_interval_days?: number; push_enabled?: boolean }) {
     setBusy(true);
@@ -60,17 +166,17 @@ export function SettingsPage({
   async function savePush(event: FormEvent) {
     event.preventDefault();
     if (!token.trim()) {
-      setError('请输入新的 PushPlus token');
+      setError('请输入新的 Server酱 SendKey');
       return;
     }
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      await api.setupPush(token.trim(), true);
+      await api.setupNotifications(token.trim(), true);
       setToken('');
       setSettings(await api.settings());
-      setNotice('PushPlus 已保存，测试提醒已发送');
+      setNotice('Server酱 已保存，测试提醒已发送');
     } catch (caught) {
       setError(messageFromError(caught));
     } finally {
@@ -258,9 +364,77 @@ export function SettingsPage({
       </section>
 
       <section className="settings-section">
+        <h3>诊断</h3>
+        <p className="form-hint">
+          用于排查真实账号登录和同步问题。诊断信息只在本机生成，不包含学号、密码、
+          SendKey、GitHub token 或快照密钥，也不会自动上传。
+        </p>
+        <div className="form-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={diagBusy}
+            onClick={() => void runPreflight()}
+          >
+            {diagBusy ? '正在检查…' : '运行环境自检'}
+          </button>
+          <button
+            type="button"
+            className="button"
+            disabled={diagBusy}
+            onClick={() => void copyDiagnostics()}
+          >
+            复制诊断信息
+          </button>
+          <button
+            type="button"
+            className="button"
+            disabled={diagBusy}
+            onClick={() => void reloadRuns()}
+          >
+            刷新同步记录
+          </button>
+        </div>
+        {diagError && <p className="form-error">{diagError}</p>}
+        {diagNotice && <p className="form-hint">{diagNotice}</p>}
+        {preflight && <PreflightSummary result={preflight} />}
+        <div className="diag-runs">
+          {runs.length === 0 ? (
+            <p className="form-hint">还没有同步记录。</p>
+          ) : (
+            runs.map((run) => (
+              <div className="diag-run" key={run.id}>
+                <div className="diag-run-head">
+                  <strong>{formatDateTime(run.started_at)}</strong>
+                  <span className={run.status === 'failed' || run.status === 'anomaly' ? 'is-alert' : 'is-ok'}>
+                    {run.status ? (RUN_STATUS_LABELS[run.status] ?? run.status) : '未知'}
+                  </span>
+                  <span className="muted">
+                    {TRIGGER_LABELS[run.trigger] ?? run.trigger} ·{' '}
+                    {formatDuration(run.duration_seconds)}
+                  </span>
+                </div>
+                <div className="diag-run-meta">
+                  {run.course_count != null && <span>课程 {run.course_count}</span>}
+                  {run.change_count != null && <span>变动 {run.change_count}</span>}
+                  {run.cloud_publish_status && (
+                    <span>云端 {run.cloud_publish_status}</span>
+                  )}
+                  {run.error_code && <span>错误码 {run.error_code}</span>}
+                </div>
+                {run.error_message && (
+                  <p className="form-error">{run.error_message}</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="settings-section">
         <h3>微信提醒</h3>
         <div className="settings-row">
-          <span>PushPlus</span>
+          <span>Server酱</span>
           <span className={`settings-value ${settings?.push_configured ? 'is-ok' : 'is-alert'}`}>
             {settings?.push_configured ? '已配置' : '未配置'}
           </span>
@@ -281,14 +455,18 @@ export function SettingsPage({
         )}
         <form className="form" onSubmit={savePush}>
           <label className="form-field">
-            <span className="form-label">PushPlus token</span>
+            <span className="form-label">Server酱 SendKey</span>
             <input
               className="input"
               type="password"
               value={token}
               onChange={(event) => setToken(event.target.value)}
               autoComplete="off"
-              placeholder={settings?.push_configured ? '输入新 token 可替换' : '粘贴 PushPlus token'}
+              placeholder={
+                settings?.push_configured
+                  ? '输入新的 SendKey 可替换'
+                  : '粘贴 SCT 开头的 SendKey'
+              }
             />
           </label>
           <div className="form-actions">
@@ -304,7 +482,13 @@ export function SettingsPage({
               发送测试提醒
             </button>
           </div>
-          <p className="form-hint">token 只保存在 Windows 凭据管理器，不会回显完整值。</p>
+          <p className="form-hint">
+            <a href="https://sct.ftqq.com/" target="_blank" rel="noreferrer">
+              获取 Server酱 SendKey
+            </a>
+            。免费会员每天 5 条，测试消息也会占用额度。SendKey 只保存在 Windows
+            凭据管理器，不会回显完整值。
+          </p>
         </form>
       </section>
 
@@ -415,6 +599,40 @@ export function SettingsPage({
             完成配置并至少发布一次后，这里会显示手机配对二维码。
           </p>
         )}
+      </section>
+
+      <section className="settings-section">
+        <h3>启动与退出</h3>
+        <div className="settings-row">
+          <span>开机时启动托盘</span>
+          <span className={`settings-value ${startup?.enabled ? 'is-ok' : 'is-alert'}`}>
+            {startup?.supported === false
+              ? '仅支持 Windows'
+              : startup?.enabled
+                ? '已启用'
+                : '未启用'}
+          </span>
+        </div>
+        {startupError && <p className="form-error">{startupError}</p>}
+        <div className="form-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={startupBusy || !startup?.supported}
+            onClick={() => void toggleStartup()}
+          >
+            {startupBusy
+              ? '正在更新…'
+              : startup?.enabled
+                ? '关闭开机自启'
+                : '开启开机自启'}
+          </button>
+        </div>
+        <p className="form-hint">
+          开启后会在 Windows 启动文件夹创建一个托盘快捷方式，下次登录时生效。
+          托盘图标可以打开下一节、立即同步、查看日志，并直接“退出并停止服务”，
+          不需要再运行停止脚本。
+        </p>
       </section>
 
       <section className="settings-section">

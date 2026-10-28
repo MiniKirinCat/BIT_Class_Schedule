@@ -1,10 +1,12 @@
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import {
   coursesForDate,
+  formatDateLabel,
   parseDateKey,
   periodTime,
   sessionKey,
   type TodayModel,
+  type UpcomingCourse,
   weekDates,
   weekdayName,
 } from '../../lib/schedule';
@@ -16,6 +18,8 @@ interface TodayCompactProps {
   unreadCount: number;
   onOpenCourse: (course: CourseSession) => void;
   onOpenChanges: () => void;
+  onGoWeek: () => void;
+  upcoming?: UpcomingCourse | null;
 }
 
 export function TodayCompact({
@@ -24,6 +28,8 @@ export function TodayCompact({
   unreadCount,
   onOpenCourse,
   onOpenChanges,
+  onGoWeek,
+  upcoming = null,
 }: TodayCompactProps) {
   const dates = weekDates(snapshot.first_day, model.week);
   const next =
@@ -77,7 +83,14 @@ export function TodayCompact({
       {model.sessions.length === 0 ? (
         <div className="empty-state">
           <strong>今天没有课</strong>
-          <span>一屏看完，今天留给别的事。</span>
+          <span>
+            {upcoming
+              ? `下一节：${formatDateLabel(upcoming.date)} ${periodTime(snapshot, upcoming.course.start_period).start} · ${upcoming.course.course_name}`
+              : '一屏看完，今天留给别的事。'}
+          </span>
+          <button type="button" className="button" onClick={onGoWeek}>
+            查看周课表
+          </button>
         </div>
       ) : (
         <div className="course-list">
