@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
+import { courseToneStyle } from '../../lib/courseColor';
 import {
   coursesForWeek,
   periodTime,
@@ -32,25 +33,42 @@ export function WeekDayList({
   }, [week, today, snapshot.first_day]);
 
   const weekday = weekdayOf(selected);
-  const sessions = coursesForWeek(snapshot, week)
+  const weekSessions = coursesForWeek(snapshot, week);
+  const sessions = weekSessions
     .filter((course) => course.weekday === weekday)
     .sort((a, b) => a.start_period - b.start_period);
 
   return (
     <>
       <div className="day-strip" aria-label={`第 ${week} 周日期`}>
-        {dates.map((date) => (
-          <button
-            key={date}
-            type="button"
-            className={`day-chip ${selected === date ? 'is-selected' : ''}`}
-            aria-pressed={selected === date}
-            onClick={() => setSelected(date)}
-          >
-            {weekdayName(weekdayOf(date))}
-            <strong>{Number(date.slice(8, 10))}</strong>
-          </button>
-        ))}
+        {dates.map((date) => {
+          const dayCourses = weekSessions.filter(
+            (course) => course.weekday === weekdayOf(date),
+          );
+          return (
+            <button
+              key={date}
+              type="button"
+              className={`day-chip ${selected === date ? 'is-selected' : ''}`}
+              aria-pressed={selected === date}
+              onClick={() => setSelected(date)}
+            >
+              {weekdayName(weekdayOf(date))}
+              <strong>{Number(date.slice(8, 10))}</strong>
+              {dayCourses.length > 0 && (
+                <span className="day-chip-dots" aria-hidden="true">
+                  {dayCourses.slice(0, 3).map((course) => (
+                    <span
+                      className="course-dot course-tone"
+                      style={courseToneStyle(course)}
+                      key={sessionKey(course)}
+                    />
+                  ))}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="day-list">
@@ -73,7 +91,8 @@ export function WeekDayList({
                 )}
                 <button
                   type="button"
-                  className="course-row"
+                  className="course-row course-tone"
+                  style={courseToneStyle(session)}
                   onClick={() => onOpenCourse(session)}
                 >
                   <span className="course-time">

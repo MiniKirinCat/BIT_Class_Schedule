@@ -79,6 +79,15 @@ export function formatDateLabel(key: string): string {
   }).format(parseDateKey(key));
 }
 
+export function formatDateKeyShort(key: string): string {
+  return `${Number(key.slice(5, 7))}/${Number(key.slice(8, 10))}`;
+}
+
+export function formatWeekRange(dates: string[]): string {
+  if (dates.length === 0) return '';
+  return `${formatDateKeyShort(dates[0])} – ${formatDateKeyShort(dates[dates.length - 1])}`;
+}
+
 export function formatDateTime(iso: string): string {
   return new Intl.DateTimeFormat('zh-CN', {
     timeZone: SHANGHAI,

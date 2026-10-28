@@ -17,6 +17,7 @@ import { useTheme } from '../lib/theme';
 import { AppShell } from '../shared/AppShell';
 import { type PageKey } from '../shared/BottomNav';
 import { StaleBadge } from '../shared/StaleBadge';
+import { useAppShortcuts } from '../shared/useAppShortcuts';
 import { TodayPage } from '../shared/TodayPage';
 import { WeekPage } from '../shared/week/WeekPage';
 import { ChangesPage } from '../shared/changes/ChangesPage';
@@ -50,6 +51,8 @@ export function LocalApp() {
     ['grid', 'list'] as const,
   );
   const [theme, setTheme] = useTheme();
+
+  useAppShortcuts({ onNavigate: setPage });
 
   const refresh = useCallback(async () => {
     setLoadError('');
@@ -245,7 +248,13 @@ export function LocalApp() {
         )}
         {content}
       </AppShell>
-      {course && <CourseDetailSheet course={course} onClose={() => setCourse(null)} />}
+      {course && (
+        <CourseDetailSheet
+          course={course}
+          snapshot={snapshot}
+          onClose={() => setCourse(null)}
+        />
+      )}
       {layoutSheet && (
         <LayoutSheet
           layout={todayLayout}

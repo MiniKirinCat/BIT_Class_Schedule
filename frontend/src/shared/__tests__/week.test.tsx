@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
@@ -100,5 +100,48 @@ describe('Week page', () => {
     expect(screen.getByText('高等数学')).toBeInTheDocument();
     expect(screen.getByText(/A101/)).toBeInTheDocument();
     expect(screen.getByText(/空档/)).toBeInTheDocument();
+  });
+
+  it('filters courses by search and clears the query', async () => {
+    render(
+      <WeekPage
+        snapshot={SNAPSHOT}
+        layout="grid"
+        onLayoutChange={vi.fn()}
+        onOpenCourse={vi.fn()}
+        today={TODAY}
+      />,
+    );
+    const search = screen.getByLabelText('搜索课程、教师或教室');
+    await userEvent.type(search, '不存在');
+    expect(screen.getByText('没有找到课程')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '清除搜索' }));
+    expect(screen.getByText('高等数学')).toBeInTheDocument();
+  });
+
+  it('navigates weeks with the keyboard and a horizontal swipe', async () => {
+    const { container } = render(
+      <WeekPage
+        snapshot={SNAPSHOT}
+        layout="grid"
+        onLayoutChange={vi.fn()}
+        onOpenCourse={vi.fn()}
+        today={TODAY}
+      />,
+    );
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByText('第 10 周')).toBeInTheDocument();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByText('第 9 周')).toBeInTheDocument();
+
+    const swipe = container.querySelector('.week-swipe');
+    expect(swipe).not.toBeNull();
+    fireEvent.touchStart(swipe!, {
+      touches: [{ clientX: 300, clientY: 100 }],
+    });
+    fireEvent.touchEnd(swipe!, {
+      changedTouches: [{ clientX: 120, clientY: 100 }],
+    });
+    expect(screen.getByText('第 10 周')).toBeInTheDocument();
   });
 });

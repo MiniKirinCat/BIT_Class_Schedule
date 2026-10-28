@@ -239,6 +239,10 @@ p {
   box-shadow: none;
 }
 
+.hero-card.is-muted::after {
+  display: none;
+}
+
 .hero-top {
   display: flex;
   align-items: center;
@@ -1400,4 +1404,369 @@ p {
 
 .theme-choice[data-theme-choice="fog"] .swatch-hero {
   background: #1b3a50;
+}
+
+/* M1: course tones, clearer hierarchy, week navigation and wide screens */
+
+.course-tone {
+  --course-color: hsl(var(--course-hue, 158) 42% 34%);
+  --course-soft: hsl(var(--course-hue, 158) 40% 93%);
+  --course-border: hsl(var(--course-hue, 158) 32% 78%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .course-tone {
+    --course-color: hsl(var(--course-hue, 158) 55% 72%);
+    --course-soft: hsl(var(--course-hue, 158) 24% 24%);
+    --course-border: hsl(var(--course-hue, 158) 28% 38%);
+  }
+}
+
+.hero-card.has-course {
+  background:
+    radial-gradient(
+      circle at 88% 10%,
+      color-mix(in srgb, var(--course-color) 38%, transparent),
+      transparent 42%
+    ),
+    var(--hero-bg);
+}
+
+.hero-card.has-course::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--course-color);
+}
+
+.hero-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.hero-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--course-color);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--course-color) 22%, transparent);
+}
+
+.hero-chip {
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--hero-text) 24%, transparent);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.hero-detail-hint {
+  display: block;
+  margin-top: 18px;
+  color: color-mix(in srgb, var(--hero-text) 72%, transparent);
+  font-size: 12px;
+}
+
+.hero-progress {
+  height: 3px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hero-text) 18%, transparent);
+}
+
+.hero-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--course-color);
+}
+
+.next-preview {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 13px;
+  border: 1px solid var(--course-border);
+  border-left: 4px solid var(--course-color);
+  border-radius: 13px;
+  color: var(--text);
+  background: var(--course-soft);
+  text-align: left;
+}
+
+.next-preview-label {
+  color: var(--course-color);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.next-preview strong {
+  font-size: 15px;
+}
+
+.next-preview span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.timeline-dot.course-tone {
+  background: var(--course-color);
+  box-shadow: 0 0 0 1px var(--course-color);
+}
+
+.timeline-content.course-tone {
+  border-left: 4px solid var(--course-color);
+}
+
+.timeline-content-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.timeline-content-head .course-status {
+  color: var(--course-color);
+}
+
+.course-row.course-tone {
+  border-left: 4px solid var(--course-color);
+  padding-left: 10px;
+}
+
+.course-row.course-tone.is-current {
+  border-left-color: var(--course-color);
+}
+
+.course-block.course-tone {
+  border-color: var(--course-border);
+  background: var(--course-soft);
+  box-shadow: inset 3px 0 0 var(--course-color);
+}
+
+.stat-card.course-tone {
+  border-top: 3px solid var(--course-color);
+}
+
+.week-day.has-course strong::after {
+  display: none;
+}
+
+.week-day-dots,
+.day-chip-dots {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  min-height: 5px;
+  margin-top: 4px;
+}
+
+.course-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--course-color);
+}
+
+.week-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.week-range {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-search {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.search-input {
+  padding-right: 42px;
+}
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+  font-size: 18px;
+  transform: translateY(-50%);
+}
+
+.search-meta {
+  margin: -2px 2px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.week-swipe {
+  touch-action: pan-y;
+}
+
+.week-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.today-focus-layout {
+  display: grid;
+  gap: 20px;
+}
+
+.today-focus-agenda {
+  min-width: 0;
+}
+
+.sheet-accent {
+  width: 64px;
+  height: 6px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: var(--course-color);
+}
+
+.sheet-section {
+  margin-top: 20px;
+}
+
+.detail-sessions {
+  display: grid;
+  gap: 7px;
+}
+
+.detail-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--course-color);
+  border-radius: 11px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.detail-session-day {
+  font-weight: 650;
+}
+
+.detail-session-time {
+  color: var(--course-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-session-room {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button,
+  .ghost-button,
+  .course-row,
+  .timeline-content,
+  .course-block,
+  .nav-item {
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .course-row:hover,
+  .course-block:hover {
+    transform: translateY(-1px);
+  }
+
+  .hero-progress span {
+    transition: width 0.4s ease;
+  }
+}
+
+@media (min-width: 1000px) {
+  .app-shell {
+    width: min(100%, 1180px);
+  }
+
+  .topbar {
+    padding-right: 34px;
+    padding-left: 34px;
+  }
+
+  .page {
+    padding: 30px 34px 104px;
+  }
+
+  .today-focus-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    align-items: start;
+    gap: 26px;
+  }
+
+  .today-focus-primary .hero-card {
+    position: sticky;
+    top: 86px;
+  }
+
+  .bottom-nav {
+    right: auto;
+    bottom: 14px;
+    left: 50%;
+    width: min(100%, 560px);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    transform: translateX(-50%);
+  }
+
+  .week-grid {
+    min-width: 0;
+    grid-template-columns: 64px repeat(7, minmax(0, 1fr));
+    grid-template-rows: auto repeat(13, minmax(64px, auto));
+  }
+
+  .week-grid-wrap {
+    overflow-x: visible;
+  }
+
+  .sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .sheet {
+    max-height: 90dvh;
+    padding-top: 22px;
+    border-radius: 22px;
+  }
+
+  .sheet-handle {
+    display: none;
+  }
 }

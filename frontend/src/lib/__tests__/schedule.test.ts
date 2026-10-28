@@ -5,6 +5,7 @@ import {
   changeDateKey,
   coursesForDate,
   formatCountdown,
+  formatWeekRange,
   groupChangesByDate,
   unreadChangeCount,
   weekDates,
@@ -116,6 +117,12 @@ describe('Shanghai date and week calculations', () => {
       '2026-10-31',
       '2026-11-01',
     ]);
+  });
+
+  it('formats a compact week date range', () => {
+    const dates = weekDates('2026-08-31', 9);
+    expect(formatWeekRange(dates)).toBe('10/26 – 11/1');
+    expect(formatWeekRange([])).toBe('');
   });
 });
 

@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
+import { courseToneStyle } from '../../lib/courseColor';
 import {
   formatCountdown,
   formatDateLabel,
@@ -41,7 +42,10 @@ export function TodayTimeline({
   return (
     <>
       <div className="stat-grid">
-        <div className="stat-card">
+        <div
+          className={`stat-card ${nextCourse ? 'course-tone' : ''}`}
+          style={nextCourse ? courseToneStyle(nextCourse) : undefined}
+        >
           <div className="stat-label">下一节</div>
           <div className="stat-value">
             {nextCourse ? nextCourse.course_name : '—'}
@@ -94,14 +98,25 @@ export function TodayTimeline({
                     {periodTime(snapshot, session.end_period).end}
                   </div>
                   <div className="timeline-rail">
-                    <span className="timeline-dot" />
+                    <span
+                      className="timeline-dot course-tone"
+                      style={courseToneStyle(session)}
+                    />
                   </div>
                   <button
                     type="button"
-                    className={`timeline-content ${nextCourse === session ? 'is-current' : ''}`}
+                    className={`timeline-content course-tone ${nextCourse === session ? 'is-current' : ''}`}
+                    style={courseToneStyle(session)}
                     onClick={() => onOpenCourse(session)}
                   >
-                    <strong>{session.course_name}</strong>
+                    <div className="timeline-content-head">
+                      <strong>{session.course_name}</strong>
+                      {nextCourse === session && (
+                        <span className="course-status">
+                          {state.kind === 'ongoing' ? '现在' : '下一节'}
+                        </span>
+                      )}
+                    </div>
                     <div className="course-meta">
                       {session.room || '教室待定'} · {session.teacher || '教师待定'}
                     </div>

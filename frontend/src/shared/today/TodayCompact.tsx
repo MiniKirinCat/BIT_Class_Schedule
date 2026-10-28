@@ -1,4 +1,5 @@
 import type { CourseSession, ScheduleSnapshot } from '../../types';
+import { courseToneStyle } from '../../lib/courseColor';
 import {
   coursesForDate,
   formatDateLabel,
@@ -42,14 +43,25 @@ export function TodayCompact({
       <div className="week-strip" aria-label="本周日期">
         {dates.map((date) => {
           const current = date === model.date;
-          const count = coursesForDate(snapshot, date).length;
+          const dayCourses = coursesForDate(snapshot, date);
           return (
             <div
-              className={`week-day ${current ? 'is-today' : ''} ${count > 0 ? 'has-course' : ''}`}
+              className={`week-day ${current ? 'is-today' : ''} ${dayCourses.length > 0 ? 'has-course' : ''}`}
               key={date}
             >
               <span>{weekdayName(parseDateKey(date).getUTCDay() === 0 ? 7 : parseDateKey(date).getUTCDay())}</span>
               <strong>{parseDateKey(date).getUTCDate()}</strong>
+              {dayCourses.length > 0 && (
+                <span className="week-day-dots" aria-hidden="true">
+                  {dayCourses.slice(0, 3).map((course) => (
+                    <span
+                      className="course-dot course-tone"
+                      style={courseToneStyle(course)}
+                      key={sessionKey(course)}
+                    />
+                  ))}
+                </span>
+              )}
             </div>
           );
         })}
@@ -100,7 +112,8 @@ export function TodayCompact({
             return (
               <button
                 type="button"
-                className={`course-row ${isCurrent ? 'is-current' : ''}`}
+                className={`course-row course-tone ${isCurrent ? 'is-current' : ''}`}
+                style={courseToneStyle(session)}
                 key={sessionKey(session)}
                 onClick={() => onOpenCourse(session)}
               >

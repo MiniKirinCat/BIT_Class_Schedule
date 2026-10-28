@@ -22,6 +22,7 @@ import { useTheme } from '../lib/theme';
 import { AppShell } from '../shared/AppShell';
 import type { PageKey } from '../shared/BottomNav';
 import { StaleBadge } from '../shared/StaleBadge';
+import { useAppShortcuts } from '../shared/useAppShortcuts';
 import { TodayPage } from '../shared/TodayPage';
 import { WeekPage } from '../shared/week/WeekPage';
 import { ChangesPage } from '../shared/changes/ChangesPage';
@@ -66,6 +67,9 @@ export function CloudApp() {
     ['grid', 'list'] as const,
   );
   const [theme, setTheme] = useTheme();
+
+  useAppShortcuts({ onNavigate: setPage, cloudMode: true });
+
   const bootstrapped = useRef(false);
   const lastLoadedAt = useRef(0);
   const loadingRef = useRef(false);
@@ -343,7 +347,13 @@ export function CloudApp() {
       >
         {content}
       </AppShell>
-      {course && <CourseDetailSheet course={course} onClose={() => setCourse(null)} />}
+      {course && (
+        <CourseDetailSheet
+          course={course}
+          snapshot={snapshot}
+          onClose={() => setCourse(null)}
+        />
+      )}
       {layoutSheet && (
         <LayoutSheet
           layout={todayLayout}

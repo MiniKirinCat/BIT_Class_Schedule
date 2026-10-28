@@ -1,4 +1,5 @@
 import type { CourseSession, ScheduleSnapshot } from '../../types';
+import { courseToneStyle } from '../../lib/courseColor';
 import {
   coursesForWeek,
   sessionKey,
@@ -45,8 +46,9 @@ export function WeekGrid({ snapshot, week, today, onOpenCourse }: WeekGridProps)
           <button
             key={sessionKey(course)}
             type="button"
-            className="course-block"
+            className="course-block course-tone"
             style={{
+              ...courseToneStyle(course),
               gridColumn: course.weekday + 1,
               gridRow: `${course.start_period + 1} / ${course.end_period + 2}`,
             }}

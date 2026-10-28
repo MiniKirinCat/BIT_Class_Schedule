@@ -92,7 +92,7 @@ function renderToday(
 describe('Today layouts', () => {
   it('renders focus mode with the ongoing class', async () => {
     const { onOpenCourse } = renderToday('focus');
-    expect(screen.getByText('正在上')).toBeInTheDocument();
+    expect(screen.getAllByText('正在上').length).toBeGreaterThan(0);
     expect(screen.getAllByText('高等数学').length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole('button', { name: /正在上/ }));
@@ -140,7 +140,8 @@ describe('Today layouts', () => {
     renderToday('focus', {
       now: new Date('2026-10-25T09:00:00+08:00'),
     });
-    expect(screen.getByText(/下一节：.*高等数学/)).toBeInTheDocument();
+    expect(screen.getByText('下一节')).toBeInTheDocument();
+    expect(screen.getByText('高等数学')).toBeInTheDocument();
   });
 
   it('marks stale snapshots in the header badge', () => {
