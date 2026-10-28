@@ -64,7 +64,11 @@ class ServerChanNotifier:
             try:
                 response = self._client.post(url, data=payload)
             except httpx.HTTPError as exc:
-                last_error = safe(exc, 200) or type(exc).__name__
+                detail = safe(exc, 160) or type(exc).__name__
+                last_error = (
+                    "无法连接 Server酱（sctapi.ftqq.com）："
+                    f"{detail}。请检查网络，或在代理中将 ftqq.com 设为直连"
+                )
                 if attempt == 0:
                     continue
                 break

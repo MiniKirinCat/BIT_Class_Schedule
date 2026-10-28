@@ -130,6 +130,8 @@ scripts\stop.ps1
 
 常见错误会给出可操作提示，例如短信验证码、登录频率限制、超时、未找到当前学期或课表解析失败。
 
+如果 Server酱测试报 `SSL: UNEXPECTED_EOF_WHILE_READING`，或 `nslookup sctapi.ftqq.com` 返回 `198.18.x.x`，说明代理的 fake-IP 把请求交给了节点。请在代理规则中让 `ftqq.com` 直连；以 Clash/Mihomo 为例，可加入 `DOMAIN-SUFFIX,ftqq.com,DIRECT`，并把 `ftqq.com` 和 `+.ftqq.com` 加入 `fake-ip-filter`，同时指定国内 DNS。
+
 ## 隐私与安全
 
 - 本地服务只绑定 `127.0.0.1`，无 CORS、无 LAN/PIN。

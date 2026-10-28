@@ -162,6 +162,7 @@ def test_transport_error_sendkey_is_redacted():
     with pytest.raises(NotificationError) as exc:
         make_notifier(handler, sendkey=secret).send("标题", "正文")
     assert secret not in str(exc.value)
+    assert "直连" in str(exc.value)
 
 
 def test_malformed_response_keeps_http_status():
