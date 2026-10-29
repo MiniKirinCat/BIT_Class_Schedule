@@ -13,12 +13,15 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-RUNTIME = ROOT / "data" / "runtime.json"
 DEFAULT_PORT = 17800
 TZ = ZoneInfo("Asia/Shanghai")
 
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
+
+from app.paths import data_dir  # noqa: E402
+
+RUNTIME = data_dir() / "runtime.json"
 
 
 def health(port: int, timeout: float = 1.0) -> bool:

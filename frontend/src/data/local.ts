@@ -9,6 +9,7 @@ import type {
   StartupStatus,
   SyncResult,
   SyncRun,
+  UpdateCheck,
 } from './types';
 
 export class ApiError extends Error {
@@ -81,6 +82,7 @@ export const api = {
   diagnostics: () => request<DiagnosticsReport>('/api/diagnostics'),
   preflight: () =>
     request<PreflightResult>('/api/diagnostics/preflight', { method: 'POST' }),
+  checkUpdate: () => request<UpdateCheck>('/api/update/check'),
   startup: () => request<StartupStatus>('/api/system/startup'),
   updateStartup: (enabled: boolean) =>
     request<StartupStatus>('/api/system/startup', {

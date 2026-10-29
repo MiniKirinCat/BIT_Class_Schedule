@@ -4,6 +4,20 @@
 
 这是单用户、本地优先的工具。本地服务只监听 `127.0.0.1`，不开放局域网；课表和设置存本机 SQLite，密码、token 只进 Windows 凭据管理器。云端 Gist 只保存 AES-256-GCM 密文，手机在浏览器内解密。
 
+v1.2 提供按用户的 Windows 安装包，自带 Python 运行时，不需要管理员权限；升级时可在 **设置 → 关于 → 检查更新** 手动检查 GitHub Releases。
+
+## 安装包（推荐）
+
+从 [GitHub Releases](https://github.com/MiniKirinCat/BIT_Class_Schedule/releases) 下载 `NextClass-Setup-<版本>.exe`，双击按向导安装即可。安装到 `%LOCALAPPDATA%\Programs\NextClass`，不需要另外安装 Python 或 Node.js。
+
+- 课表、日志和运行状态在 `%LOCALAPPDATA%\NextClass\data`；
+- 卸载默认保留课表数据，便于重新安装后继续使用；
+- 安装包当前没有代码签名，SmartScreen 提示时请先核对来源和 SHA256；
+- 更新检查只读取 GitHub 公开版本信息，不会自动下载或安装；
+- 从源码版切换到安装版时，先退出源码版，把 `data\next_class.db` 复制到 `%LOCALAPPDATA%\NextClass\data`，否则历史学期不会自动带过去；凭据管理器中的密码和 token 会沿用。
+
+完整的安装、升级、卸载、构建和发布步骤见 **[Windows 安装包、升级与发布](docs/install.md)**。下面的内容是从源码运行和开发的方式。
+
 ## 环境
 
 - Windows 10/11
@@ -11,9 +25,9 @@
 - Node.js 20+
 - 能访问北理工统一身份认证和教务系统（校园网或 WebVPN）
 
-## 初始化
+## 初始化（源码运行）
 
-在项目根目录 PowerShell 中运行：
+普通用户使用上面的安装包即可。以下步骤适合开发、修改代码或直接运行源码。在项目根目录 PowerShell 中运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
@@ -60,6 +74,12 @@ scripts\start.ps1
 托盘启动时会复用已经健康的本地实例；没有实例时才在后台启动一个无控制台窗口的服务。重复运行托盘不会启动第二份；`start.vbs` 和默认的 `scripts\start.ps1` 会带 `--open`，因此会打开现有页面。
 
 在 **设置 → 启动与退出 → 开启开机自启** 会在 Windows 启动文件夹创建 `下一节.lnk`，登录后自动运行托盘；再次点击即可关闭。该操作写入当前用户目录，不需要管理员权限。
+
+## 手动检查更新
+
+打开 **设置 → 关于 → 检查更新**。应用先读取 GitHub Releases API，遇到限流或代理拦截时回退到公开的 Releases Atom 源，获取最新版本号。发现新版本时显示版本、发布时间、Release 说明（Atom 回退时可能没有说明）和发布页链接。它不会上传账号、课表或密钥，也不会自动下载或静默安装。
+
+更新方式：关闭托盘，运行新版本的 `NextClass-Setup-<版本>.exe` 覆盖安装。课表历史、设置和凭据都会保留。仓库还没有发布 Release 时，检查会显示“还没有已发布的版本”。
 
 ## 首次配置
 
@@ -148,7 +168,8 @@ scripts\start.ps1
 - 本地服务只绑定 `127.0.0.1`，无 CORS、无 LAN/PIN。
 - 学号密码、Server酱 SendKey、GitHub token、快照密钥都存在 Windows 凭据管理器；SQLite、日志、前端产物中不保存这些值。
 - 日志轮转 1 MB × 3，写入前对密码、token、Cookie、Authorization、URL 查询参数脱敏。
-- 课表数据在 `data\next_class.db`；日志在 `data\app.log`。
+- 安装版的课表数据在 `%LOCALAPPDATA%\NextClass\data\next_class.db`，日志在同一目录的 `app.log`；从源码运行时在项目 `data\next_class.db` 和 `data\app.log`。
+- 卸载安装版默认保留 `%LOCALAPPDATA%\NextClass\data`，不会删除课表历史；凭据管理器中的条目也不会自动删除，需要时请手动清理服务名 `next-class`。
 - Gist 只保存密文。GitHub Pages 上只有静态代码，不含 token、账号或密钥。
 - 二维码由本地 `/api/setup/qr` 生成，响应禁止缓存；只在 `127.0.0.1` 可访问。
 - 手机端明文快照缓存在站点 localStorage；清除站点数据或点击“清除本机数据”会移除。
@@ -192,6 +213,14 @@ npm run e2e
 ```
 
 `npm run e2e` 会先构建 `dist-local` 和 `dist-cloud`。冒烟测试使用假数据服务 `scripts/dev_fixture_server.py` 与 `scripts/dev_cloud_fixture_server.py`，不会访问真实教务系统或 GitHub，也不需要账号密码。
+
+构建 Windows 安装包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1
+```
+
+脚本会构建前端、下载并校验官方 Python embeddable 运行时、组装 `.build\installer-stage`、做启动冒烟检查，最后用 Inno Setup 输出 `dist\NextClass-Setup-<版本>.exe`。需要先安装 Inno Setup 6；完整参数、发布流程和排错见 [docs/install.md](docs/install.md)。
 
 ## 主要依赖
 

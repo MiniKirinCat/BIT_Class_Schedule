@@ -23,6 +23,7 @@ from .startup import (
     startup_status,
 )
 from .sync_service import SyncBusyError
+from .update import check_latest_release
 
 logger = logging.getLogger("next_class.api")
 TZ = ZoneInfo("Asia/Shanghai")
@@ -369,6 +370,10 @@ def create_app(
         except SyncBusyError as exc:
             raise HTTPException(status_code=409, detail="同步正在进行中，请稍候") from exc
         return _sync_result(result)
+
+    @app.get("/api/update/check")
+    def update_check() -> dict:
+        return check_latest_release(config.app_version)
 
     @app.get("/api/system/startup")
     def get_startup() -> dict:

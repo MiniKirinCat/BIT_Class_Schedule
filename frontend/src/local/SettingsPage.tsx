@@ -6,6 +6,7 @@ import type {
   PreflightResult,
   StartupStatus,
   SyncRun,
+  UpdateCheck,
 } from '../data/types';
 import { api, messageFromError } from '../data/local';
 import { formatDateTime } from '../lib/schedule';
@@ -72,6 +73,9 @@ export function SettingsPage({
   const [startup, setStartup] = useState<StartupStatus | null>(null);
   const [startupBusy, setStartupBusy] = useState(false);
   const [startupError, setStartupError] = useState('');
+  const [update, setUpdate] = useState<UpdateCheck | null>(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateError, setUpdateError] = useState('');
 
   useEffect(() => {
     api.settings()
@@ -101,6 +105,19 @@ export function SettingsPage({
       setStartupError(messageFromError(caught));
     } finally {
       setStartupBusy(false);
+    }
+  }
+
+  async function checkUpdate() {
+    setUpdateBusy(true);
+    setUpdateError('');
+    setUpdate(null);
+    try {
+      setUpdate(await api.checkUpdate());
+    } catch (caught) {
+      setUpdateError(messageFromError(caught));
+    } finally {
+      setUpdateBusy(false);
     }
   }
 
@@ -646,9 +663,79 @@ export function SettingsPage({
           <span>版本</span>
           <span className="settings-value">{status.version}</span>
         </div>
+        <div className="form-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={updateBusy}
+            onClick={() => void checkUpdate()}
+          >
+            {updateBusy ? '正在检查…' : '检查更新'}
+          </button>
+        </div>
+        <p className="form-hint">
+          检查更新只读取 GitHub Releases 的公开版本信息，不会上传账号、课表或密钥，
+          也不会自动下载或安装。
+        </p>
+        {updateError && <p className="form-error">{updateError}</p>}
+        {update && (
+          <div className="update-result">
+            {update.status === 'error' && (
+              <p className="form-error">{update.error ?? '检查更新失败'}</p>
+            )}
+            {update.status === 'unpublished' && (
+              <p className="form-hint">
+                GitHub 上还没有已发布的版本。发布安装包后，这里会显示最新版本。
+              </p>
+            )}
+            {update.status === 'ok' && !update.update_available && (
+              <p className="form-hint">已是最新版本（{update.latest_version}）。</p>
+            )}
+            {update.update_available && (
+              <>
+                <div className="settings-row">
+                  <span>最新版本</span>
+                  <span className="settings-value is-ok">
+                    {update.latest_version}
+                  </span>
+                </div>
+                {update.release_name && update.release_name !== update.latest_version && (
+                  <div className="settings-row">
+                    <span>发布名称</span>
+                    <span className="settings-value">{update.release_name}</span>
+                  </div>
+                )}
+                {update.published_at && (
+                  <div className="settings-row">
+                    <span>发布时间</span>
+                    <span className="settings-value">
+                      {formatDateTime(update.published_at)}
+                    </span>
+                  </div>
+                )}
+                {update.notes && <p className="update-notes">{update.notes}</p>}
+                {update.release_url && (
+                  <a
+                    className="button button-primary"
+                    href={update.release_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    打开发布页面
+                  </a>
+                )}
+                <p className="form-hint">
+                  下载安装包后运行即可覆盖升级，学期历史和设置会保留。
+                </p>
+              </>
+            )}
+          </div>
+        )}
         <div className="settings-row">
           <span>数据与凭据</span>
-          <span className="settings-value">课表在 data 目录；密码与 token 在 Windows 凭据管理器</span>
+          <span className="settings-value">
+            课表在本机数据目录；密码与 token 在 Windows 凭据管理器
+          </span>
         </div>
         <p className="form-hint">
           应用只监听 127.0.0.1。云端只读页面由 GitHub Pages 提供，不包含教务账号或

@@ -1,0 +1,1 @@
+`ChineseSimplified.isl` is the Simplified Chinese Inno Setup 6.5.0+ translation from the official `jrsoftware/issrc` repository (`Files/Languages/ChineseSimplified.isl`). It is bundled only to build the installer UI; it is not part of the application at runtime.

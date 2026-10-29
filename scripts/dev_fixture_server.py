@@ -192,6 +192,23 @@ def status():
     }
 
 
+@app.get("/api/update/check")
+def update_check():
+    now = datetime.now(TZ)
+    return {
+        "status": "ok",
+        "current_version": "1.2.0",
+        "latest_version": "v1.2.1",
+        "update_available": True,
+        "release_url": "https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v1.2.1",
+        "release_name": "下一节 1.2.1",
+        "published_at": now.isoformat(timespec="seconds"),
+        "notes": "测试发布说明",
+        "checked_at": now.isoformat(timespec="seconds"),
+        "error": None,
+    }
+
+
 @app.get("/api/settings")
 def settings():
     return {

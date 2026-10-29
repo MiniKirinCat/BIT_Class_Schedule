@@ -102,6 +102,14 @@ test('settings shows diagnostics, preflight, and startup controls', async ({ pag
 
   await page.getByRole('button', { name: '开启开机自启' }).click();
   await expect(page.getByRole('button', { name: '关闭开机自启' })).toBeVisible();
+
+  await page.getByRole('button', { name: '检查更新' }).click();
+  await expect(page.getByText('最新版本')).toBeVisible();
+  await expect(page.getByText('测试发布说明')).toBeVisible();
+  await expect(page.getByRole('link', { name: '打开发布页面' })).toHaveAttribute(
+    'href',
+    /releases\/tag\/v1\.2\.1/,
+  );
 });
 
 test.describe('desktop week default', () => {

@@ -22,11 +22,22 @@ def shortcut_path(directory: Path | None = None) -> Path:
     return (directory or startup_dir()) / STARTUP_SHORTCUT_NAME
 
 
+def pythonw_path(root: Path) -> Path:
+    candidates = (
+        root / "runtime" / "pythonw.exe",
+        root / ".venv" / "Scripts" / "pythonw.exe",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise StartupError(
+        "找不到 Python 运行时，请重新安装下一节或运行 scripts/setup.ps1"
+    )
+
+
 def tray_paths(root: Path) -> tuple[Path, Path]:
-    target = root / ".venv" / "Scripts" / "pythonw.exe"
+    target = pythonw_path(root)
     script = root / "scripts" / "tray.py"
-    if not target.is_file():
-        raise StartupError("找不到 .venv\\Scripts\\pythonw.exe，请先运行 scripts/setup.ps1")
     if not script.is_file():
         raise StartupError("找不到 scripts/tray.py")
     return target, script

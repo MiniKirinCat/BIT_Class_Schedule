@@ -1,12 +1,14 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+from .paths import PROJECT_ROOT, data_dir
+
+__all__ = ["PROJECT_ROOT", "AppConfig"]
 
 
 @dataclass(frozen=True)
 class AppConfig:
-    data_dir: Path = PROJECT_ROOT / "data"
+    data_dir: Path = field(default_factory=data_dir)
     frontend_dir: Path = PROJECT_ROOT / "frontend" / "dist-local"
     app_version: str = "1.2.0"
     scheduler_enabled: bool = True

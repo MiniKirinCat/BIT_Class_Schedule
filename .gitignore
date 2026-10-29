@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Installer build staging and outputs
+.build/
+/dist/
+
 # Node
 node_modules/
 frontend/dist/

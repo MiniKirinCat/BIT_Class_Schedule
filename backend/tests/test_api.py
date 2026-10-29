@@ -144,6 +144,32 @@ def test_status_and_dashboard_before_setup(tmp_path):
         assert client.post("/api/sync").status_code == 400
 
 
+def test_update_check_endpoint_returns_release_state(tmp_path, monkeypatch):
+    app, _, _ = make_app(tmp_path, FakeGateway())
+    monkeypatch.setattr(
+        "app.api.check_latest_release",
+        lambda version: {
+            "status": "ok",
+            "current_version": version,
+            "latest_version": "v1.3.0",
+            "update_available": True,
+            "release_url": "https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v1.3.0",
+            "release_name": "下一节 1.3.0",
+            "published_at": "2026-10-29T10:00:00Z",
+            "notes": None,
+            "checked_at": "2026-10-29T10:00:00+08:00",
+            "error": None,
+        },
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/update/check")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["current_version"] == AppConfig().app_version
+        assert body["latest_version"] == "v1.3.0"
+        assert body["update_available"] is True
+
+
 def test_setup_school_syncs_and_then_enforces_cooldown(tmp_path):
     gateway = FakeGateway()
     app, credentials, _ = make_app(tmp_path, gateway)

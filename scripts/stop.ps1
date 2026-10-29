@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$runtime = Join-Path $root "data\runtime.json"
+. (Join-Path $PSScriptRoot "paths.ps1")
+$runtime = Join-Path (Get-NextClassDataDir -Root $root) "runtime.json"
 
 if (-not (Test-Path $runtime)) {
     Write-Host "下一节未运行。"

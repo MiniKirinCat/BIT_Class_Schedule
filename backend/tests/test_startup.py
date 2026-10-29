@@ -7,6 +7,7 @@ from app.startup import (
     build_shortcut_script,
     disable_startup,
     enable_startup,
+    pythonw_path,
     startup_status,
 )
 
@@ -17,6 +18,14 @@ def make_root(tmp_path: Path) -> Path:
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "tray.py").write_text("", encoding="utf-8")
     return tmp_path
+
+
+def test_bundled_runtime_is_preferred(tmp_path):
+    root = make_root(tmp_path)
+    bundled = root / "runtime" / "pythonw.exe"
+    bundled.parent.mkdir()
+    bundled.write_text("", encoding="utf-8")
+    assert pythonw_path(root) == bundled
 
 
 def test_build_shortcut_script_quotes_apostrophes():

@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   syncRuns: vi.fn(),
   startup: vi.fn(),
   updateStartup: vi.fn(),
+  checkUpdate: vi.fn(),
   preflight: vi.fn(),
   diagnostics: vi.fn(),
   setupNotifications: vi.fn(),
@@ -124,6 +125,18 @@ beforeEach(() => {
     note: '已脱敏',
   });
   api.updateStartup.mockResolvedValue({ supported: true, enabled: true });
+  api.checkUpdate.mockResolvedValue({
+    status: 'ok',
+    current_version: '0.1.0',
+    latest_version: 'v0.2.0',
+    update_available: true,
+    release_url: 'https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v0.2.0',
+    release_name: 'v0.2.0',
+    published_at: '2026-10-28T10:00:00Z',
+    notes: '修复同步问题',
+    checked_at: '2026-10-28T10:00:00+08:00',
+    error: null,
+  });
 });
 
 describe('Settings diagnostics and notifications', () => {
@@ -159,5 +172,19 @@ describe('Settings diagnostics and notifications', () => {
     await userEvent.click(button);
     expect(api.updateStartup).toHaveBeenCalledWith(true);
     expect(await screen.findByRole('button', { name: '关闭开机自启' })).toBeInTheDocument();
+  });
+
+  it('checks for a new GitHub release without offering auto-install', async () => {
+    renderSettings();
+    await userEvent.click(screen.getByRole('button', { name: '检查更新' }));
+    expect(api.checkUpdate).toHaveBeenCalled();
+    expect(await screen.findByText('v0.2.0')).toBeInTheDocument();
+    expect(screen.getByText('修复同步问题')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: '打开发布页面' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v0.2.0',
+    );
+    expect(screen.queryByRole('button', { name: /安装更新/ })).not.toBeInTheDocument();
   });
 });

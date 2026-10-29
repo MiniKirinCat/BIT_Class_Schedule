@@ -14,8 +14,15 @@ import pystray
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME = ROOT / "data" / "runtime.json"
-LOG = ROOT / "data" / "app.log"
+
+if str(ROOT / "backend") not in sys.path:
+    sys.path.insert(0, str(ROOT / "backend"))
+
+from app.paths import data_dir  # noqa: E402
+
+DATA_DIR = data_dir()
+RUNTIME = DATA_DIR / "runtime.json"
+LOG = DATA_DIR / "app.log"
 ICON = ROOT / "frontend" / "public" / "icon-192.png"
 MUTEX_NAME = "Local\\NextClassTray"
 ERROR_ALREADY_EXISTS = 183

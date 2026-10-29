@@ -87,6 +87,19 @@ export interface StartupStatus {
   enabled: boolean;
 }
 
+export interface UpdateCheck {
+  status: 'ok' | 'unpublished' | 'error';
+  current_version: string;
+  latest_version: string | null;
+  update_available: boolean;
+  release_url: string | null;
+  release_name: string | null;
+  published_at: string | null;
+  notes: string | null;
+  checked_at: string;
+  error: string | null;
+}
+
 export interface DiagnosticsReport {
   format: string;
   version: number;
