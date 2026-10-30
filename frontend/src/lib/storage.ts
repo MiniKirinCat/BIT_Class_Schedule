@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import type { ThemeName, TodayLayout, WeekLayout } from '../types';
+import type { AppMode, WeekLayout } from '../types';
 
 export const STORAGE_KEYS = {
-  todayLayout: 'next-class.todayLayout',
+  appMode: 'next-class.appMode',
   weekLayout: 'next-class.weekLayout',
-  theme: 'next-class.theme',
   lastSeenChangeId: 'next-class.lastSeenChangeId',
 } as const;
 
@@ -58,7 +57,7 @@ export function defaultWeekLayout(): WeekLayout {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return 'list';
   }
-  return window.matchMedia('(min-width: 900px)').matches ? 'grid' : 'list';
+  return window.matchMedia('(min-width: 920px)').matches ? 'grid' : 'list';
 }
 
 export function readLastSeenChangeId(): number {
@@ -70,4 +69,4 @@ export function writeLastSeenChangeId(id: number): void {
   writeStorage(STORAGE_KEYS.lastSeenChangeId, String(id));
 }
 
-export type { ThemeName, TodayLayout, WeekLayout };
+export type { AppMode, WeekLayout };

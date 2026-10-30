@@ -315,3 +315,188 @@ export function calendarEntryFor(
 ): CalendarEntry | undefined {
   return snapshot.calendar.find((entry) => entry.date === date);
 }
+
+export function formatClockTime(now: Date): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: SHANGHAI,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now);
+}
+
+export function formatKickerDate(now: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SHANGHAI,
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${String(value.weekday).toUpperCase()} · ${String(value.month).toUpperCase()} ${value.day}`;
+}
+
+export function dateOfWeek(
+  firstDay: string,
+  week: number,
+  weekday: number,
+): string {
+  return addDays(firstDay, (week - 1) * 7 + weekday - 1);
+}
+
+export function semesterWeeks(snapshot: ScheduleSnapshot): number {
+  const max = snapshot.courses.reduce(
+    (value, course) => Math.max(value, ...course.weeks),
+    0,
+  );
+  return Math.max(20, max);
+}
+
+export function semesterProgress(snapshot: ScheduleSnapshot, week: number): number {
+  return Math.min(100, Math.round((week / semesterWeeks(snapshot)) * 100));
+}
+
+export function monthKeyOfDate(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthKeyOfToday(now: Date): string {
+  return dateKeyInShanghai(now).slice(0, 7);
+}
+
+export function monthDates(monthKey: string): string[] {
+  const first = `${monthKey}-01`;
+  const offset = weekdayOf(first) - 1;
+  const start = addDays(first, -offset);
+  return Array.from({ length: 42 }, (_, index) => addDays(start, index));
+}
+
+export function monthTitle(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  return `${year} 年 ${month} 月`;
+}
+
+export function shiftMonthKey(monthKey: string, delta: number): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + delta, 1, 12));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthWeekRange(
+  snapshot: ScheduleSnapshot,
+  monthKey: string,
+): string {
+  const total = semesterWeeks(snapshot);
+  const weeks = monthDates(monthKey)
+    .filter((date) => date.startsWith(monthKey))
+    .map((date) => weekForDate(snapshot, date).week)
+    .filter((week) => week >= 1 && week <= total);
+  if (weeks.length === 0) return '学期之外';
+  const first = Math.min(...weeks);
+  const last = Math.max(...weeks);
+  return first === last ? `第 ${first} 周` : `第 ${first}–${last} 周`;
+}
+
+export function monthSessionCount(
+  snapshot: ScheduleSnapshot,
+  monthKey: string,
+): number {
+  return monthDates(monthKey)
+    .filter((date) => date.startsWith(monthKey))
+    .reduce((sum, date) => sum + coursesForDate(snapshot, date).length, 0);
+}
+
+export function formatMonthShort(date: string): string {
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+}
+
+export function relativeDayLabel(date: string, today: string): string {
+  const offset = daysBetween(today, date);
+  if (offset === 0) return '今天';
+  if (offset === 1) return '明天';
+  if (offset === 2) return '后天';
+  return weekdayName(weekdayOf(date));
+}
+
+export function formatWeeks(weeks: number[]): string {
+  const sorted = [...new Set(weeks)].sort((a, b) => a - b);
+  if (sorted.length === 0) return '未填写';
+  const ranges: Array<[number, number]> = [];
+  let start = sorted[0];
+  let previous = sorted[0];
+  for (let index = 1; index <= sorted.length; index += 1) {
+    const current = sorted[index];
+    if (current !== previous + 1) {
+      ranges.push([start, previous]);
+      start = current;
+    }
+    previous = current;
+  }
+  return ranges
+    .map(([from, to]) => (from === to ? `第${from}周` : `第${from}–${to}周`))
+    .join('、');
+}
+
+export function periodLabel(session: CourseSession): string {
+  return session.start_period === session.end_period
+    ? `第${session.start_period}节`
+    : `第${session.start_period}–${session.end_period}节`;
+}
+
+export function teacherShort(teacher: string): string {
+  return teacher.split(/[,，、]/)[0]?.trim() || '教师待定';
+}
+
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} 分钟`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} 小时 ${rest} 分` : `${hours} 小时`;
+}
+
+export interface UpcomingSession {
+  date: string;
+  course: CourseSession;
+}
+
+export function upcomingSessions(
+  snapshot: ScheduleSnapshot,
+  now: Date,
+  limit = 3,
+  today = dateKeyInShanghai(now),
+): UpcomingSession[] {
+  const result: UpcomingSession[] = [];
+  for (let offset = 0; offset < 28 && result.length < limit; offset += 1) {
+    const date = addDays(today, offset);
+    for (const course of coursesForDate(snapshot, date)) {
+      if (result.length >= limit) break;
+      if (offset === 0 && sessionStart(snapshot, course, date).getTime() <= now.getTime()) {
+        continue;
+      }
+      result.push({ date, course });
+    }
+  }
+  return result;
+}
+
+export function previewWeek(
+  snapshot: ScheduleSnapshot,
+  week: number,
+  limit = 2,
+): CourseSession[] {
+  const sessions = coursesForWeek(snapshot, week);
+  const picked: CourseSession[] = [];
+  const seen = new Set<number>();
+  for (const session of sessions) {
+    if (!seen.has(session.weekday)) {
+      picked.push(session);
+      seen.add(session.weekday);
+    }
+    if (picked.length >= limit) return picked;
+  }
+  for (const session of sessions) {
+    if (!picked.includes(session)) picked.push(session);
+    if (picked.length >= limit) break;
+  }
+  return picked;
+}

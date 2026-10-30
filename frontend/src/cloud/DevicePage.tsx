@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { ScheduleSnapshot, ThemeName, TodayLayout, WeekLayout } from '../types';
+import type { AppMode, ScheduleSnapshot, WeekLayout } from '../types';
 import { formatDateTime } from '../lib/schedule';
-import { ThemePicker } from '../shared/ThemePicker';
 import { maskSnapshotUrl, type CloudConfig } from './protocol';
 
 interface DevicePageProps {
@@ -11,12 +10,10 @@ interface DevicePageProps {
   fromCache: boolean;
   cachedAt: string | null;
   lastPullAt: string | null;
-  theme: ThemeName;
-  todayLayout: TodayLayout;
+  mode: AppMode;
   weekLayout: WeekLayout;
   refreshBusy: boolean;
-  onThemeChange: (theme: ThemeName) => void;
-  onTodayLayoutChange: (layout: TodayLayout) => void;
+  onModeChange: (mode: AppMode) => void;
   onWeekLayoutChange: (layout: WeekLayout) => void;
   onRefresh: () => void;
   onDisconnect: () => void;
@@ -29,12 +26,10 @@ export function DevicePage({
   fromCache,
   cachedAt,
   lastPullAt,
-  theme,
-  todayLayout,
+  mode,
   weekLayout,
   refreshBusy,
-  onThemeChange,
-  onTodayLayoutChange,
+  onModeChange,
   onWeekLayoutChange,
   onRefresh,
   onDisconnect,
@@ -63,144 +58,141 @@ export function DevicePage({
   }, []);
 
   return (
-    <section className="settings-page">
-      <header className="page-head">
-        <div>
-          <p className="eyebrow">云端只读</p>
-          <h2 className="page-title">设备</h2>
-        </div>
-      </header>
+    <section className="page settings-page">
+      <div className="mobile-page-head">
+        <div className="eyebrow">DEVICE · READ ONLY</div>
+        <h1>设备</h1>
+        <p className="page-sub">配对、缓存与离线应用壳</p>
+      </div>
 
-      <section className="settings-section">
-        <h3>快照</h3>
-        <div className="settings-row">
-          <span>快照地址</span>
-          <span className="settings-value">{maskSnapshotUrl(config.snapshotUrl)}</span>
-        </div>
-        <div className="settings-row">
-          <span>Gist</span>
-          <span className="settings-value">{config.gistId}</span>
-        </div>
-        <div className="settings-row">
-          <span>解密密钥</span>
-          <span className="settings-value is-ok">已保存在本机</span>
-        </div>
-        <div className="settings-row">
-          <span>学期归档</span>
-          <span className="settings-value">
-            {termCount} 个学期 · 当前 {snapshot.term}
-          </span>
-        </div>
-        <div className="settings-row">
-          <span>离线应用壳</span>
-          <span
-            className={`settings-value ${offlineShell === 'ready' ? 'is-ok' : ''}`}
-          >
-            {offlineShell === 'ready'
-              ? '已缓存，断网可打开'
-              : offlineShell === 'unsupported'
-                ? '当前浏览器不支持'
-                : '首次联网加载后可用'}
-          </span>
-        </div>
-        <div className="settings-row">
-          <span>最后同步</span>
-          <span className="settings-value">
-            {formatDateTime(snapshot.synced_at)}
-          </span>
-        </div>
-        <div className="settings-row">
-          <span>数据来源</span>
-          <span className={`settings-value ${fromCache ? 'is-alert' : 'is-ok'}`}>
-            {fromCache
-              ? `缓存快照${cachedAt ? ` · 缓存于 ${formatDateTime(cachedAt)}` : ''}`
-              : '云端最新快照'}
-          </span>
-        </div>
-        <div className="settings-row">
-          <span>上次拉取</span>
-          <span className="settings-value">
-            {lastPullAt ? formatDateTime(lastPullAt) : '—'}
-          </span>
-        </div>
-        <div className="form-actions">
-          <button
-            type="button"
-            className="button button-primary"
-            disabled={refreshBusy}
-            onClick={onRefresh}
-          >
-            {refreshBusy ? '正在拉取…' : '重新拉取'}
-          </button>
-        </div>
-        <p className="form-hint">
-          云端页面没有后台同步；电脑端发布新快照后，手动拉取或重新打开即可更新。
-          拉取失败时会继续显示本机缓存，密钥错误则不会回退到旧数据。
-        </p>
-      </section>
+      <div className="settings-grid">
+        <section className="card settings-section">
+          <div className="eyebrow">SNAPSHOT</div>
+          <h2>快照</h2>
+          <div className="setting-row">
+            <span>快照地址</span>
+            <strong>{maskSnapshotUrl(config.snapshotUrl)}</strong>
+          </div>
+          <div className="setting-row">
+            <span>Gist</span>
+            <strong>{config.gistId}</strong>
+          </div>
+          <div className="setting-row">
+            <span>解密密钥</span>
+            <strong className="is-ok">已保存在本机</strong>
+          </div>
+          <div className="setting-row">
+            <span>学期归档</span>
+            <strong>
+              {termCount} 个学期 · 当前 {snapshot.term}
+            </strong>
+          </div>
+          <div className="setting-row">
+            <span>离线应用壳</span>
+            <strong className={offlineShell === 'ready' ? 'is-ok' : ''}>
+              {offlineShell === 'ready'
+                ? '已缓存，断网可打开'
+                : offlineShell === 'unsupported'
+                  ? '当前浏览器不支持'
+                  : '首次联网加载后可用'}
+            </strong>
+          </div>
+          <div className="setting-row">
+            <span>最后同步</span>
+            <strong>{formatDateTime(snapshot.synced_at)}</strong>
+          </div>
+          <div className="setting-row">
+            <span>数据来源</span>
+            <strong className={fromCache ? 'is-alert' : 'is-ok'}>
+              {fromCache
+                ? `缓存快照${cachedAt ? ` · 缓存于 ${formatDateTime(cachedAt)}` : ''}`
+                : '云端最新快照'}
+            </strong>
+          </div>
+          <div className="setting-row">
+            <span>上次拉取</span>
+            <strong>{lastPullAt ? formatDateTime(lastPullAt) : '—'}</strong>
+          </div>
+          <div className="settings-actions">
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={refreshBusy}
+              onClick={onRefresh}
+            >
+              {refreshBusy ? '正在拉取…' : '重新拉取'}
+            </button>
+          </div>
+          <p className="form-hint">
+            云端页面没有后台同步；电脑端发布新快照后，手动拉取或重新打开即可更新。
+            拉取失败时会继续显示本机缓存，密钥错误则不会回退到旧数据。
+          </p>
+        </section>
 
-      <section className="settings-section">
-        <h3>今天页布局</h3>
-        <label className="form-field">
-          <span className="form-label">显示方式</span>
-          <select
-            className="select"
-            aria-label="今天页布局"
-            value={todayLayout}
-            onChange={(event) =>
-              onTodayLayoutChange(event.target.value as TodayLayout)
-            }
-          >
-            <option value="focus">聚焦下一节</option>
-            <option value="timeline">时间轴</option>
-            <option value="compact">信息密度</option>
-          </select>
-        </label>
-        <label className="form-field">
-          <span className="form-label">周课表布局</span>
-          <select
-            className="select"
-            aria-label="周课表布局"
-            value={weekLayout}
-            onChange={(event) =>
-              onWeekLayoutChange(event.target.value as WeekLayout)
-            }
-          >
-            <option value="grid">整周网格</option>
-            <option value="list">单日列表</option>
-          </select>
-        </label>
-      </section>
-
-      <section className="settings-section">
-        <h3>主题</h3>
-        <ThemePicker theme={theme} onChange={onThemeChange} />
-      </section>
-
-      <section className="settings-section">
-        <h3>本机数据</h3>
-        <p className="form-hint">
-          本机保存快照地址、解密密钥、最近一次成功解密的全部学期快照，以及布局和主题偏好。
-        </p>
-        <div className="form-actions">
-          <button
-            type="button"
-            className={`button ${confirmClear ? 'button-danger' : ''}`}
-            onClick={() => {
-              if (confirmClear) {
-                onDisconnect();
-              } else {
-                setConfirmClear(true);
+        <section className="card settings-section">
+          <div className="eyebrow">LAYOUT</div>
+          <h2>布局</h2>
+          <p className="section-note">
+            桌面端可在工作台与专注之间切换；手机上始终使用单日课表与底部导航。
+          </p>
+          <div className="settings-actions">
+            <button
+              type="button"
+              className={`settings-button ${mode === 'workbench' ? 'is-active' : ''}`}
+              onClick={() => onModeChange('workbench')}
+            >
+              工作台
+            </button>
+            <button
+              type="button"
+              className={`settings-button ${mode === 'focus' ? 'is-active' : ''}`}
+              onClick={() => onModeChange('focus')}
+            >
+              专注
+            </button>
+          </div>
+          <label className="form-field">
+            <span className="form-label">周课表显示</span>
+            <select
+              className="select"
+              aria-label="周课表布局"
+              value={weekLayout}
+              onChange={(event) =>
+                onWeekLayoutChange(event.target.value as WeekLayout)
               }
-            }}
-          >
-            {confirmClear ? '再次点击确认清除' : '清除本机数据'}
-          </button>
-        </div>
-        <p className="form-hint">
-          清除后需要重新扫描本机设置页的二维码；电脑端课表和 Gist 不受影响。
-        </p>
-      </section>
+            >
+              <option value="grid">整周网格</option>
+              <option value="list">单日列表</option>
+            </select>
+          </label>
+        </section>
+
+        <section className="card settings-section">
+          <div className="eyebrow">LOCAL DATA</div>
+          <h2>本机数据</h2>
+          <p className="form-hint">
+            本机保存快照地址、解密密钥、最近一次成功解密的全部学期快照，以及布局偏好。
+          </p>
+          <div className="settings-actions">
+            <button
+              type="button"
+              className={`button ${confirmClear ? 'button-danger' : ''}`}
+              onClick={() => {
+                if (confirmClear) {
+                  onDisconnect();
+                } else {
+                  setConfirmClear(true);
+                }
+              }}
+            >
+              {confirmClear ? '再次点击确认清除' : '清除本机数据'}
+            </button>
+          </div>
+          <p className="form-hint">
+            清除后需要重新扫描本机设置页的二维码；电脑端课表和 Gist 不受影响。
+          </p>
+        </section>
+      </div>
     </section>
   );
 }

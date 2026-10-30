@@ -1,11 +1,15 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
-import { courseToneStyle } from '../../lib/courseColor';
+import { courseColorStyle } from '../../lib/courseColor';
 import { buildCourseIcs, courseIcsFilename } from '../../lib/ics';
 import {
   compareSessions,
+  periodLabel,
   periodTime,
   sessionKey,
+  formatWeeks,
+  teacherShort,
   weekdayName,
 } from '../../lib/schedule';
 import { Sheet } from '../Sheet';
@@ -54,8 +58,7 @@ export function CourseDetailSheet({
         )
       : [selected]
   ).sort(compareSessions);
-  const weeks =
-    selected.weeks.length > 0 ? `第 ${selected.weeks.join('、')} 周` : '未填写';
+  const weeks = formatWeeks(selected.weeks);
 
   function summary(): string {
     return [
@@ -70,7 +73,7 @@ export function CourseDetailSheet({
           ? `${periodTime(snapshot, session.start_period).start}-${periodTime(snapshot, session.end_period).end}`
           : '';
         return [
-          `${weekdayName(session.weekday)} 第 ${session.start_period}-${session.end_period} 节`,
+          `${weekdayName(session.weekday)} ${periodLabel(session)}`,
           time,
         ]
           .filter(Boolean)
@@ -111,47 +114,53 @@ export function CourseDetailSheet({
   }
 
   return (
-    <Sheet title={selected.course_name} onClose={onClose}>
+    <Sheet
+      title={selected.course_name}
+      kicker={`COURSE · ${selected.course_code || '未填写课程代码'}`}
+      onClose={onClose}
+    >
       <div
-        className="sheet-accent course-tone"
-        style={courseToneStyle(selected)}
+        className="sheet-accent"
+        style={courseColorStyle(selected) as CSSProperties}
       />
       <div className="sheet-meta">
-        <div><strong>教师：</strong>{selected.teacher || '未填写'}</div>
-        <div><strong>教室：</strong>{selected.room || '未填写'}</div>
-        <div><strong>校区：</strong>{selected.campus || '未填写'}</div>
-        <div><strong>周次：</strong>{weeks}</div>
-        {selected.raw_time_text && (
-          <div><strong>原始时间：</strong>{selected.raw_time_text}</div>
-        )}
+        <span className="pill">{teacherShort(selected.teacher)}</span>
+        <span className="pill">{selected.room || '教室待定'}</span>
+        {selected.campus && <span className="pill">{selected.campus}</span>}
+        <span className="pill">{weeks}</span>
       </div>
 
       <div className="sheet-section">
-        <div className="section-head">
-          <h3 className="section-title">本学期安排</h3>
-          <span className="muted">{sessions.length} 次课</span>
+        <div className="sheet-section-label">
+          全部上课安排 · {sessions.length} 段
         </div>
-        <div className="detail-sessions">
+        <div className="session-list">
           {sessions.map((session) => (
-            <div className="detail-session" key={sessionKey(session)}>
-              <span className="detail-session-day">
-                {weekdayName(session.weekday)} · 第 {session.start_period}-
-                {session.end_period} 节
+            <div className="session-item" key={sessionKey(session)}>
+              <span className="session-item-main">
+                <strong>
+                  {weekdayName(session.weekday)} · {periodLabel(session)}
+                </strong>
+                <span>
+                  {session.room || '教室待定'}
+                  {session.campus ? ` · ${session.campus}` : ''}
+                </span>
+                <small>{formatWeeks(session.weeks)}</small>
               </span>
               {snapshot && (
-                <span className="detail-session-time">
+                <span className="pill">
                   {periodTime(snapshot, session.start_period).start}–
                   {periodTime(snapshot, session.end_period).end}
                 </span>
               )}
-              <span className="detail-session-room">
-                {session.room || '教室待定'}
-                {session.campus ? ` · ${session.campus}` : ''}
-              </span>
             </div>
           ))}
         </div>
       </div>
+
+      {selected.raw_time_text && (
+        <p className="sheet-note">原始时间：{selected.raw_time_text}</p>
+      )}
 
       <div className="sheet-actions">
         <button type="button" className="button" onClick={() => void handleCopy()}>
@@ -166,8 +175,16 @@ export function CourseDetailSheet({
           添加到日历（ICS）
         </button>
       </div>
-      {notice && <p className="form-hint" aria-live="polite">{notice}</p>}
-      {error && <p className="form-error" aria-live="polite">{error}</p>}
+      {notice && (
+        <p className="form-hint" aria-live="polite">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p className="form-error" aria-live="polite">
+          {error}
+        </p>
+      )}
     </Sheet>
   );
 }

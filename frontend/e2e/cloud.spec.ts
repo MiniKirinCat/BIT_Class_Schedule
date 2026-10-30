@@ -41,7 +41,7 @@ function fixtureSnapshot() {
 
   return {
     schema_version: 2,
-    app_version: '1.2.0',
+    app_version: '1.3.0',
     synced_at: now,
     sync_interval_days: 1,
     current_term: '2026-2027-1',
@@ -170,28 +170,34 @@ test('cloud PWA imports a QR fragment, decrypts and falls back to cache', async 
   }).toString();
   await page.goto(`${CLOUD_URL}/#${hash}`);
 
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
   expect(page.url()).not.toContain('key=');
-  await expect(page.getByRole('button', { name: '周课表', exact: true })).toBeVisible();
+  await expect(
+    page.locator('.bottom-nav').getByRole('button', { name: '课表', exact: true }),
+  ).toBeVisible();
 
-  await page.getByRole('button', { name: '周课表', exact: true }).click();
-  await expect(page.getByText('快照测试课').first()).toBeVisible();
+  await page.locator('.bottom-nav').getByRole('button', { name: '课表', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '课表', exact: true })).toBeVisible();
+  await expect(
+    page.locator('.day-course', { hasText: '快照测试课' }),
+  ).toBeVisible();
 
-  await page.getByRole('button', { name: '变动' }).click();
-  await expect(page.getByText(/调整教室/)).toBeVisible();
+  await page.locator('.bottom-nav').getByRole('button', { name: '变动' }).click();
+  await expect(page.locator('.change-diff').first()).toContainText('调整教室');
 
-  await page.getByRole('button', { name: '设备' }).click();
+  await page.locator('.bottom-nav').getByRole('button', { name: '设备' }).click();
   await expect(page.getByText('云端最新快照')).toBeVisible();
   await expect(page.getByText(/2 个学期/)).toBeVisible();
-  await expect(page.getByText('离线应用壳')).toBeVisible();
-  await page.getByRole('button', { name: '雾蓝' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'fog');
+  await expect(page.getByText('离线应用壳', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '专注' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'focus');
+  await page.getByRole('button', { name: '工作台' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'workbench');
 
   await page.route('https://gist.example/**', (route) => route.abort());
   await page.route('https://api.github.com/**', (route) => route.abort());
   await page.reload();
   await expect(page.getByText('正在显示缓存快照')).toBeVisible();
-  await expect(page.getByText(/缓存快照 ·/)).toBeVisible();
 });
 
 test('cloud PWA switches to an archived term and back', async ({ page }) => {
@@ -211,7 +217,7 @@ test('cloud PWA switches to an archived term and back', async ({ page }) => {
     key: KEY,
   }).toString();
   await page.goto(`${CLOUD_URL}/#${hash}`);
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /切换学期/ }).click();
   let dialog = page.getByRole('dialog');
@@ -220,15 +226,22 @@ test('cloud PWA switches to an archived term and back', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: '学期回顾' })).toBeVisible();
   await expect(page.getByText('历史快照课').first()).toBeVisible();
-  await page.locator('.bottom-nav').getByRole('button', { name: '周课表' }).click();
-  await expect(page.getByText('历史快照课').first()).toBeVisible();
+  await page.getByRole('button', { name: '查看这个学期的课表' }).click();
+  await expect(page.getByRole('heading', { name: '课表', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '首周' })).toBeVisible();
+  await page.locator('.day-strip-button').nth(1).click();
+  await expect(
+    page.locator('.day-course', { hasText: '历史快照课' }),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: /切换学期/ }).click();
   dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: /2026-2027-1/ }).click();
-  await page.locator('.bottom-nav').getByRole('button', { name: '今天' }).click();
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
-  await expect(page.getByText('快照测试课').first()).toBeVisible();
+  await page.locator('.bottom-nav').getByRole('button', { name: '今天', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
+  await expect(
+    page.locator('.today-page').getByText('快照测试课').first(),
+  ).toBeVisible();
 });
 
 test('cloud PWA opens the cached shell when offline', async ({ page }) => {
@@ -248,7 +261,7 @@ test('cloud PWA opens the cached shell when offline', async ({ page }) => {
     key: KEY,
   }).toString();
   await page.goto(`${CLOUD_URL}/#${hash}`);
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
 
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
@@ -257,14 +270,14 @@ test('cloud PWA opens the cached shell when offline', async ({ page }) => {
     () => navigator.serviceWorker.controller !== null,
   );
   await page.reload();
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
 
   await page.route('https://gist.example/**', (route) => route.abort());
   await page.route('https://api.github.com/**', (route) => route.abort());
   await page.context().setOffline(true);
   await page.reload();
   await expect(page.getByText('正在显示缓存快照')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
   await page.context().setOffline(false);
 });
 

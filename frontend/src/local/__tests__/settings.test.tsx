@@ -51,8 +51,8 @@ function renderSettings() {
   return render(
     <SettingsPage
       status={STATUS}
-      theme="warm"
-      onThemeChange={vi.fn()}
+      mode="workbench"
+      onModeChange={vi.fn()}
       onRelogin={vi.fn()}
       onSync={vi.fn()}
       onRefresh={vi.fn()}

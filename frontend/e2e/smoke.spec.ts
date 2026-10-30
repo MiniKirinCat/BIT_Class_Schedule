@@ -1,62 +1,69 @@
 import { expect, test } from '@playwright/test';
 
-test('mobile local app: today layouts, week layouts, changes, and theme', async ({ page }) => {
+test('mobile workbench, merged schedule, changes, and settings', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
+  await expect(page.getByText('今日时间线')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+  await expect(page.locator('html')).toHaveAttribute('data-mode', 'workbench');
 
-  await page.getByRole('button', { name: '布局' }).click();
-  await page.getByRole('button', { name: /信息密度/ }).click();
-  await expect(page.getByText('今日节数')).toBeVisible();
-
-  await page.getByRole('button', { name: '布局' }).click();
-  await page.getByRole('button', { name: /时间轴/ }).click();
-  await expect(page.getByText('今日概览')).toBeVisible();
-
-  await page.getByRole('button', { name: '周课表', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '周课表' })).toBeVisible();
-  await page.getByRole('button', { name: '单日' }).click();
+  await page.locator('.bottom-nav').getByRole('button', { name: '课表', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '课表', exact: true })).toBeVisible();
   await expect(page.locator('.day-strip')).toBeVisible();
-  await page.getByRole('button', { name: '整周' }).click();
-  await expect(page.locator('.week-grid')).toBeVisible();
+  await expect(page.locator('.week-board')).toBeHidden();
 
-  await page.getByRole('button', { name: '变动' }).click();
+  await page.getByRole('tab', { name: '月', exact: true }).click();
+  await expect(page.locator('.month-grid')).toBeVisible();
+  await expect(page.getByText('月历', { exact: true })).toBeVisible();
+
+  await page.getByRole('tab', { name: '学期', exact: true }).click();
+  await expect(page.locator('.semester-stats')).toBeVisible();
+  await expect(page.getByText('周次总览 · 课程密度')).toBeVisible();
+  await page.getByRole('button', { name: '课程时间轴' }).click();
+  await expect(page.locator('.timeline-grid')).toBeVisible();
+
+  await page.locator('.bottom-nav').getByRole('button', { name: '变动' }).click();
   await expect(page.getByRole('heading', { name: '变动' })).toBeVisible();
-  await expect(page.getByText(/调整/).first()).toBeVisible();
+  await expect(page.locator('.change-card').first()).toBeVisible();
 
-  await page.getByRole('button', { name: '设置' }).click();
-  await page.getByRole('button', { name: '雾蓝' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'fog');
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'fog');
-  await page.getByRole('button', { name: '设置' }).click();
-  await page.getByRole('button', { name: '暖纸' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'warm');
+  await page.locator('.bottom-nav').getByRole('button', { name: '设置' }).click();
+  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '外观' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '桌面形态' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '雾蓝' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '暖纸' })).toHaveCount(0);
 });
 
-test('week search, keyboard navigation, and course actions', async ({ page }) => {
+test('week search and keyboard navigation', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
   await page.keyboard.press('w');
-  await expect(page.getByRole('heading', { name: '周课表' })).toBeVisible();
-  await page.getByRole('button', { name: '整周' }).click();
+  await expect(page.getByRole('heading', { name: '课表', exact: true })).toBeVisible();
+
+  const weekLabel = page.locator('.week-label strong');
+  await expect(weekLabel).toHaveText(/第 \d+ 周/);
+  const firstWeek = await weekLabel.textContent();
 
   const search = page.getByLabel('搜索课程、教师或教室');
   await search.fill('不存在');
-  await expect(page.getByText('没有找到课程')).toBeVisible();
+  await expect(page.getByText('找到 0 门课程')).toBeVisible();
+  await expect(page.locator('.week-empty-note')).toContainText('没有找到');
   await page.getByRole('button', { name: '清除搜索' }).click();
-  await expect(page.getByText('高等数学')).toBeVisible();
+  await expect(page.locator('.search-meta')).toHaveCount(0);
 
+  await search.blur();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByText('第 10 周')).toBeVisible();
+  await expect(weekLabel).not.toHaveText(firstWeek ?? '');
   await page.keyboard.press('ArrowLeft');
-  await expect(page.getByText('第 9 周')).toBeVisible();
+  await expect(weekLabel).toHaveText(firstWeek ?? '');
+
   await page.keyboard.press('t');
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
 });
 
 test('switches to an archived term and back', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /切换学期/ }).click();
   const dialog = page.getByRole('dialog');
@@ -65,33 +72,31 @@ test('switches to an archived term and back', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: '学期回顾' })).toBeVisible();
   await expect(page.getByText('历史测试课').first()).toBeVisible();
-  await page.locator('.bottom-nav').getByRole('button', { name: '周课表' }).click();
-  await expect(page.getByText('历史测试课').first()).toBeVisible();
+
+  await page.getByRole('button', { name: '查看这个学期的课表' }).click();
+  await expect(page.getByRole('heading', { name: '课表', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '首周' })).toBeVisible();
+  await page.locator('.day-strip-button').nth(1).click();
+  await expect(
+    page.locator('.day-course', { hasText: '历史测试课' }),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: /切换学期/ }).click();
-  await page.getByRole('dialog').getByRole('button', { name: /2026-2027-1/ }).click();
-  await page.locator('.bottom-nav').getByRole('button', { name: '今天' }).click();
-  await expect(page.getByRole('heading', { name: '今天' })).toBeVisible();
-});
-
-test('course detail offers copy and ICS download', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: '周课表', exact: true }).click();
-  await page.getByRole('button', { name: '整周' }).click();
-  await page.locator('.course-block', { hasText: '高等数学' }).first().click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: '高等数学' })).toBeVisible();
-  await expect(dialog.getByText('本学期安排')).toBeVisible();
-
-  const downloadPromise = page.waitForEvent('download');
-  await dialog.getByRole('button', { name: '添加到日历（ICS）' }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toContain('.ics');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /2026-2027-1/ })
+    .click();
+  await page.locator('.bottom-nav').getByRole('button', { name: '今天', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
+  await expect(
+    page.locator('.today-page').getByText('今日测试课').first(),
+  ).toBeVisible();
 });
 
 test('settings shows diagnostics, preflight, and startup controls', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: '设置' }).click();
+  await page.locator('.bottom-nav').getByRole('button', { name: '设置' }).click();
+  await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '诊断' })).toBeVisible();
   await expect(page.getByText('Server酱', { exact: true })).toBeVisible();
   await expect(page.getByText('课程 4')).toBeVisible();
@@ -104,41 +109,65 @@ test('settings shows diagnostics, preflight, and startup controls', async ({ pag
   await expect(page.getByRole('button', { name: '关闭开机自启' })).toBeVisible();
 
   await page.getByRole('button', { name: '检查更新' }).click();
-  await expect(page.getByText('最新版本')).toBeVisible();
+  await expect(page.getByText('最新版本', { exact: true })).toBeVisible();
   await expect(page.getByText('测试发布说明')).toBeVisible();
   await expect(page.getByRole('link', { name: '打开发布页面' })).toHaveAttribute(
     'href',
-    /releases\/tag\/v1\.2\.1/,
+    /releases\/tag\/v1\.3\.1/,
   );
 });
 
-test.describe('desktop week default', () => {
+test.describe('desktop workspace', () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test('defaults to the grid layout', async ({ page }) => {
+  test('keeps the sidebar navigation anchored on settings', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: '周课表', exact: true }).click();
-    await expect(page.locator('.week-grid')).toBeVisible();
+    const nav = page.locator('.side-nav');
+    const before = await nav.boundingBox();
+    await page.getByRole('button', { name: '设置', exact: true }).click();
+    await expect(page.getByRole('button', { name: /切换学期/ })).toBeVisible();
+    const after = await nav.boundingBox();
+    expect(after?.y).toBe(before?.y);
   });
 
-  test('uses a two-column today layout on wide screens', async ({ page }) => {
+  test('grid schedule, focus mode, and course ICS', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.today-focus-layout')).toBeVisible();
-    const columns = await page
-      .locator('.today-focus-layout')
-      .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
-    expect(columns.split(' ')).toHaveLength(2);
+    await expect(page.getByRole('heading', { name: '今天', exact: true })).toBeVisible();
+    await expect(page.locator('.right-rail')).toBeVisible();
+
+    await page.getByRole('button', { name: '课表', exact: true }).click();
+    await expect(page.locator('.week-board')).toBeVisible();
+    await page.locator('.week-course', { hasText: '高等数学' }).first().click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: '高等数学' })).toBeVisible();
+    await expect(dialog.getByText(/全部上课安排/)).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await dialog.getByRole('button', { name: '添加到日历（ICS）' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('.ics');
+    await dialog.getByRole('button', { name: '关闭' }).click();
+
+    await page.getByRole('button', { name: '专注' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-mode', 'focus');
+    await expect(page.locator('.right-rail')).toBeHidden();
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-mode', 'focus');
+    await page.getByRole('button', { name: '工作台' }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-mode', 'workbench');
+    await expect(page.locator('.right-rail')).toBeVisible();
   });
 });
 
 test.describe('system dark mode', () => {
   test.use({ colorScheme: 'dark' });
 
-  test('uses the dark token set without a manual toggle', async ({ page }) => {
+  test('uses the dark paper tokens without a manual toggle', async ({ page }) => {
     await page.goto('/');
     const background = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
     );
-    expect(background).toBe('#171a18');
+    expect(background).toBe('#141713');
   });
 });

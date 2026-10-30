@@ -119,7 +119,7 @@ describe('term switching', () => {
       expect.objectContaining({ course_name: '历史测试课' }),
     );
 
-    await user.click(screen.getByRole('button', { name: '周课表' }));
+    await user.click(screen.getByRole('button', { name: '查看这个学期的课表' }));
     expect(onGoWeek).toHaveBeenCalled();
   });
 });

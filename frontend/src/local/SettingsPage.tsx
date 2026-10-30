@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { ThemeName } from '../types';
+import type { AppMode } from '../types';
 import type {
   AppSettings,
   AppStatus,
@@ -11,7 +11,6 @@ import type {
 import { api, messageFromError } from '../data/local';
 import { formatDateTime } from '../lib/schedule';
 import { PreflightSummary } from '../shared/PreflightSummary';
-import { ThemePicker } from '../shared/ThemePicker';
 
 const RUN_STATUS_LABELS: Record<string, string> = {
   success: '正常',
@@ -36,8 +35,8 @@ function formatDuration(seconds: number | null): string {
 
 interface SettingsPageProps {
   status: AppStatus;
-  theme: ThemeName;
-  onThemeChange: (theme: ThemeName) => void;
+  mode: AppMode;
+  onModeChange: (mode: AppMode) => void;
   onRelogin: () => void;
   onSync: () => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -47,8 +46,8 @@ interface SettingsPageProps {
 
 export function SettingsPage({
   status,
-  theme,
-  onThemeChange,
+  mode,
+  onModeChange,
   onRelogin,
   onSync,
   onRefresh,
@@ -296,16 +295,62 @@ export function SettingsPage({
             : '尚未同步';
 
   return (
-    <section className="settings-page">
-      <header className="page-head">
-        <div>
-          <p className="eyebrow">本地管理端</p>
-          <h2 className="page-title">设置</h2>
-        </div>
-      </header>
+    <section className="page settings-page">
+      <div className="mobile-page-head">
+        <div className="eyebrow">PREFERENCES · LOCAL FIRST</div>
+        <h1>设置</h1>
+        <p className="page-sub">本机数据、提醒与外观</p>
+      </div>
 
       {error && <p className="form-error">{error}</p>}
       {notice && <p className="form-hint">{notice}</p>}
+
+      <div className="settings-grid">
+        <section className="settings-section card">
+          <div className="eyebrow">APPEARANCE</div>
+          <h2>外观</h2>
+          <p className="section-note">
+            “纸页”是这一版唯一的视觉主题：暖白纸张、深绿主色与衬线标题。
+            深色模式跟随系统，不需要手动切换。
+          </p>
+          <div className="theme-paper-card">
+            <span className="theme-paper-swatch" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>
+              <strong>纸页 · 暖白 / 深绿</strong>
+              <small>当前主题 · 自动适配系统深色</small>
+            </span>
+            <span className="pill is-active">使用中</span>
+          </div>
+        </section>
+
+        <section className="settings-section card">
+          <div className="eyebrow">DESKTOP LAYOUT</div>
+          <h2>桌面形态</h2>
+          <p className="section-note">
+            工作台保留周概览、下一节和变动侧栏；专注模式收起侧栏与右侧信息，
+            只留下今天的时间线。桌面模式只影响宽屏，手机端始终使用底部导航。
+          </p>
+          <div className="settings-actions">
+            <button
+              type="button"
+              className={`settings-button ${mode === 'workbench' ? 'is-active' : ''}`}
+              onClick={() => onModeChange('workbench')}
+            >
+              工作台
+            </button>
+            <button
+              type="button"
+              className={`settings-button ${mode === 'focus' ? 'is-active' : ''}`}
+              onClick={() => onModeChange('focus')}
+            >
+              专注
+            </button>
+          </div>
+        </section>
 
       <section className="settings-section">
         <h3>账号</h3>
@@ -653,11 +698,6 @@ export function SettingsPage({
       </section>
 
       <section className="settings-section">
-        <h3>主题</h3>
-        <ThemePicker theme={theme} onChange={onThemeChange} />
-      </section>
-
-      <section className="settings-section">
         <h3>关于</h3>
         <div className="settings-row">
           <span>版本</span>
@@ -742,6 +782,7 @@ export function SettingsPage({
           GitHub token。
         </p>
       </section>
+      </div>
     </section>
   );
 }

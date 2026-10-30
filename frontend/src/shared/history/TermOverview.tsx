@@ -1,9 +1,10 @@
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import { courseGroups, weekSpan } from '../../lib/archive';
-import { courseToneStyle } from '../../lib/courseColor';
+import { changeTypeLabel } from '../../lib/changeView';
+import { courseColorStyle } from '../../lib/courseColor';
 import {
-  changeTypeLabel,
   formatDateTime,
+  periodLabel,
   weekdayName,
 } from '../../lib/schedule';
 
@@ -25,20 +26,16 @@ export function TermOverview({
   const recentChanges = snapshot.changes.slice(0, 3);
 
   return (
-    <section className="history-page">
-      <header className="page-head">
-        <div>
-          <p className="eyebrow">
-            历史学期 · 最后同步于 {formatDateTime(snapshot.synced_at)}
-          </p>
-          <h2 className="page-title">学期回顾</h2>
-        </div>
-        <button type="button" className="ghost-button" onClick={onGoWeek}>
-          周课表
-        </button>
-      </header>
+    <section className="page history-page">
+      <div className="mobile-page-head">
+        <div className="eyebrow">ARCHIVE · TERM REVIEW</div>
+        <h1>学期回顾</h1>
+        <p className="page-sub">
+          {snapshot.term} · 最后同步于 {formatDateTime(snapshot.synced_at)}
+        </p>
+      </div>
 
-      <div className="history-summary">
+      <div className="card history-summary">
         <div className="history-stats">
           <div>
             <strong>{groups.length}</strong>
@@ -57,11 +54,19 @@ export function TermOverview({
           {span ? `第 ${span.first}–${span.last} 周` : '周次未填写'} · 起始日{' '}
           {snapshot.first_day}
         </p>
+        <div className="settings-actions">
+          <button type="button" className="button" onClick={onGoWeek}>
+            查看这个学期的课表
+          </button>
+          <button type="button" className="button" onClick={onOpenChanges}>
+            历年变动
+          </button>
+        </div>
       </div>
 
-      <div className="section-head history-course-head">
+      <div className="section-head">
         <h3 className="section-title">课程一览</h3>
-        <span className="muted">{groups.length} 门</span>
+        <span className="card-meta">{groups.length} 门</span>
       </div>
       <div className="history-courses">
         {groups.map((group) => {
@@ -70,8 +75,8 @@ export function TermOverview({
             <button
               key={group.key}
               type="button"
-              className="history-course course-tone"
-              style={courseToneStyle(group.course)}
+              className="history-course"
+              style={courseColorStyle(group.course)}
               onClick={() => onOpenCourse(group.course)}
             >
               <span className="history-course-body">
@@ -82,8 +87,7 @@ export function TermOverview({
                 </span>
               </span>
               <span className="history-course-meta">
-                {weekdayName(first.weekday)} · 第 {first.start_period}-
-                {first.end_period} 节
+                {weekdayName(first.weekday)} · {periodLabel(first)}
                 {group.sessions.length > 1
                   ? ` · 共 ${group.sessions.length} 次`
                   : ''}
@@ -105,13 +109,11 @@ export function TermOverview({
             {recentChanges.map((change) => (
               <div className="history-change" key={change.id}>
                 <span className="change-type">
-                  {changeTypeLabel(change.type)}
+                  <span>{changeTypeLabel(change.type)}</span>
+                  <small>{formatDateTime(change.detected_at)}</small>
                 </span>
                 <div>
-                  <div className="change-summary">{change.summary}</div>
-                  <div className="change-time">
-                    {formatDateTime(change.detected_at)}
-                  </div>
+                  <div className="change-summary-line">{change.summary}</div>
                 </div>
               </div>
             ))}

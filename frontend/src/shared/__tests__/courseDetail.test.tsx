@@ -57,8 +57,8 @@ describe('CourseDetailSheet', () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText('2 次课')).toBeInTheDocument();
-    expect(screen.getByText(/周三 · 第 5-6 节/)).toBeInTheDocument();
+    expect(screen.getByText(/2 段/)).toBeInTheDocument();
+    expect(screen.getByText(/周三 · 第5–6节/)).toBeInTheDocument();
     expect(screen.getByText(/B202/)).toBeInTheDocument();
   });
 
@@ -80,7 +80,7 @@ describe('CourseDetailSheet', () => {
       expect.stringContaining('教师：李老师'),
     );
     expect(writeText).toHaveBeenCalledWith(
-      expect.stringContaining('周一 第 1-2 节 08:00-09:45'),
+      expect.stringContaining('周一 第1–2节 08:00-09:45'),
     );
     expect(screen.getByText('课程信息已复制')).toBeInTheDocument();
   });

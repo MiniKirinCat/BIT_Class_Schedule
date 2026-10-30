@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type {
+  AppMode,
+  ChangeRecord,
   CourseSession,
+  PageKey,
+  PageMeta,
   ScheduleArchive,
-  TodayLayout,
   WeekLayout,
 } from '../types';
 import {
@@ -11,9 +20,13 @@ import {
   snapshotForTerm,
 } from '../lib/archive';
 import {
+  buildTodayModel,
+  currentWeek,
   dateKeyInShanghai,
+  formatDateLabel,
   formatDateTime,
   unreadChangeCount,
+  weekdayName,
 } from '../lib/schedule';
 import {
   defaultWeekLayout,
@@ -23,16 +36,16 @@ import {
   useStoredChoice,
   writeLastSeenChangeId,
 } from '../lib/storage';
-import { useTheme } from '../lib/theme';
 import { AppShell } from '../shared/AppShell';
-import type { PageKey } from '../shared/BottomNav';
-import { StaleBadge } from '../shared/StaleBadge';
 import { useAppShortcuts } from '../shared/useAppShortcuts';
 import { TodayPage } from '../shared/TodayPage';
-import { WeekPage } from '../shared/week/WeekPage';
+import {
+  SchedulePage,
+  type ScheduleIntent,
+} from '../shared/schedule/SchedulePage';
 import { ChangesPage } from '../shared/changes/ChangesPage';
+import { ChangeDetailSheet } from '../shared/changes/ChangeDetailSheet';
 import { CourseDetailSheet } from '../shared/today/CourseDetailSheet';
-import { LayoutSheet } from '../shared/today/LayoutSheet';
 import { TermSheet } from '../shared/TermSheet';
 import { TermOverview } from '../shared/history/TermOverview';
 import { CloudConnect } from './CloudConnect';
@@ -60,25 +73,37 @@ export function CloudApp() {
   const [error, setError] = useState<CloudLoadError | null>(null);
   const [page, setPage] = useState<PageKey>('today');
   const [course, setCourse] = useState<CourseSession | null>(null);
-  const [layoutSheet, setLayoutSheet] = useState(false);
+  const [change, setChange] = useState<ChangeRecord | null>(null);
   const [termSheet, setTermSheet] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [lastSeenId, setLastSeenId] = useState(readLastSeenChangeId);
+  const [scheduleIntent, setScheduleIntent] = useState<ScheduleIntent | null>(
+    null,
+  );
+  const [scheduleMeta, setScheduleMeta] = useState<PageMeta | null>(null);
   const currentTermRef = useRef('');
+  const intentNonce = useRef(0);
 
-  const [todayLayout, setTodayLayout] = useStoredChoice<TodayLayout>(
-    STORAGE_KEYS.todayLayout,
-    'focus',
-    ['focus', 'timeline', 'compact'] as const,
+  const [mode, setMode] = useStoredChoice<AppMode>(
+    STORAGE_KEYS.appMode,
+    'workbench',
+    ['workbench', 'focus'] as const,
   );
   const [weekLayout, setWeekLayout] = useStoredChoice<WeekLayout>(
     STORAGE_KEYS.weekLayout,
     defaultWeekLayout(),
     ['grid', 'list'] as const,
   );
-  const [theme, setTheme] = useTheme();
 
   useAppShortcuts({ onNavigate: setPage, cloudMode: true });
+
+  useEffect(() => {
+    document.documentElement.dataset.mode = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    if (page !== 'schedule') setScheduleMeta(null);
+  }, [page]);
 
   const bootstrapped = useRef(false);
   const lastLoadedAt = useRef(0);
@@ -203,9 +228,8 @@ export function CloudApp() {
   const disconnect = useCallback(() => {
     clearCloudState();
     for (const key of Object.values(STORAGE_KEYS)) removeStorage(key);
-    setTodayLayout('focus');
+    setMode('workbench');
     setWeekLayout(defaultWeekLayout());
-    setTheme('warm');
     setLastSeenId(0);
     setConfig(null);
     setArchive(null);
@@ -220,7 +244,7 @@ export function CloudApp() {
     setPage('today');
     setLoading(false);
     setInitialized(true);
-  }, [setTheme, setTodayLayout, setWeekLayout]);
+  }, [setMode, setWeekLayout]);
 
   const refresh = useCallback(() => {
     if (config && !loadingRef.current) void load(config);
@@ -229,6 +253,12 @@ export function CloudApp() {
   const markSeen = useCallback((id: number) => {
     setLastSeenId(id);
     writeLastSeenChangeId(id);
+  }, []);
+
+  const openSchedule = useCallback((intent: Omit<ScheduleIntent, 'nonce'>) => {
+    intentNonce.current += 1;
+    setScheduleIntent({ ...intent, nonce: intentNonce.current });
+    setPage('schedule');
   }, []);
 
   if (!initialized) {
@@ -296,11 +326,50 @@ export function CloudApp() {
   const archived = isArchivedTerm(archive, snapshot.term);
   const unread = unreadChangeCount(current.changes, lastSeenId);
   const today = dateKeyInShanghai(now);
+  const model = buildTodayModel(snapshot, now);
+
+  const meta: PageMeta = (() => {
+    if (page === 'device') {
+      return {
+        kicker: 'DEVICE · READ ONLY',
+        title: '设备',
+        subtitle: '配对、缓存与离线应用壳',
+      };
+    }
+    if (page === 'schedule' && scheduleMeta) {
+      return scheduleMeta;
+    }
+    if (page === 'changes') {
+      return {
+        kicker: `SYNC DELTA · ${snapshot.changes.length} ITEMS`,
+        title: '变动',
+        subtitle: archived
+          ? `${snapshot.term} · 历史学期只读记录`
+          : '教室调整、节次调整与停课，按检测时间排序',
+      };
+    }
+    if (page === 'today' && archived) {
+      return {
+        kicker: 'ARCHIVE · TERM REVIEW',
+        title: '学期回顾',
+        subtitle: `${snapshot.term} · 历史学期`,
+      };
+    }
+    return {
+      kicker: `WEEK ${String(model.week).padStart(2, '0')} · ${weekdayName(model.weekday)}`,
+      title: '今天',
+      subtitle: `${formatDateLabel(model.date)} · 第 ${model.week} 周${
+        model.estimatedWeek ? '（推算）' : ''
+      }`,
+    };
+  })();
+
   const banner = fromCache ? (
     <div className="cloud-banner" role="status">
       <strong>正在显示缓存快照</strong>
       <span>
-        {warning || '无法连接云端。'} 快照同步于 {formatDateTime(current.synced_at)}
+        {warning || '无法连接云端。'} 快照同步于{' '}
+        {formatDateTime(current.synced_at)}
         {cachedAt ? ` · 本机缓存于 ${formatDateTime(cachedAt)}` : ''}
         {lastPullAt ? ` · 本次拉取 ${formatDateTime(lastPullAt)}` : ''}
       </span>
@@ -325,37 +394,39 @@ export function CloudApp() {
         fromCache={fromCache}
         cachedAt={cachedAt}
         lastPullAt={lastPullAt}
-        theme={theme}
-        todayLayout={todayLayout}
+        mode={mode}
         weekLayout={weekLayout}
         refreshBusy={loading}
-        onThemeChange={setTheme}
-        onTodayLayoutChange={setTodayLayout}
+        onModeChange={setMode}
         onWeekLayoutChange={setWeekLayout}
         onRefresh={refresh}
         onDisconnect={disconnect}
       />
     );
-  } else if (page === 'week') {
+  } else if (page === 'schedule') {
     content = (
-      <WeekPage
+      <SchedulePage
         key={snapshot.term}
         snapshot={snapshot}
-        layout={weekLayout}
         today={today}
-        weekAnchor={archived ? null : undefined}
-        onLayoutChange={setWeekLayout}
+        weekLayout={weekLayout}
+        archived={archived}
+        intent={scheduleIntent}
+        onWeekLayoutChange={setWeekLayout}
         onOpenCourse={setCourse}
+        onMeta={setScheduleMeta}
       />
     );
   } else if (page === 'changes') {
     content = (
       <ChangesPage
-        changes={snapshot.changes}
+        snapshot={snapshot}
         lastSeenId={lastSeenId}
         onSeen={markSeen}
         term={snapshot.term}
         archived={archived}
+        onOpenCourse={setCourse}
+        onOpenChange={setChange}
       />
     );
   } else if (archived) {
@@ -363,7 +434,7 @@ export function CloudApp() {
       <TermOverview
         snapshot={snapshot}
         onOpenCourse={setCourse}
-        onGoWeek={() => setPage('week')}
+        onGoWeek={() => openSchedule({ view: 'week' })}
         onOpenChanges={() => setPage('changes')}
       />
     );
@@ -372,12 +443,17 @@ export function CloudApp() {
       <TodayPage
         snapshot={snapshot}
         now={now}
-        layout={todayLayout}
         unreadCount={unread}
         onOpenCourse={setCourse}
-        onOpenLayout={() => setLayoutSheet(true)}
+        onOpenChange={setChange}
         onOpenChanges={() => setPage('changes')}
-        onGoWeek={() => setPage('week')}
+        onOpenWeek={() =>
+          openSchedule({ view: 'week', week: currentWeek(snapshot, today) })
+        }
+        onOpenDay={(week, weekday) =>
+          openSchedule({ view: 'week', week, weekday })
+        }
+        onOpenSemester={() => openSchedule({ view: 'semester' })}
       />
     );
   }
@@ -388,17 +464,15 @@ export function CloudApp() {
         snapshot={current}
         page={page}
         onNavigate={setPage}
+        meta={meta}
         cloudMode
         term={snapshot.term}
         currentTerm={archive.current_term}
         onChooseTerm={() => setTermSheet(true)}
-        statusChip={
-          <StaleBadge
-            snapshot={current}
-            cached={fromCache}
-            verboseSyncTime
-          />
-        }
+        mode={mode}
+        onModeChange={setMode}
+        unreadCount={unread}
+        cached={fromCache}
         banner={banner}
       >
         {content}
@@ -410,14 +484,14 @@ export function CloudApp() {
           onClose={() => setCourse(null)}
         />
       )}
-      {layoutSheet && (
-        <LayoutSheet
-          layout={todayLayout}
-          onSelect={(next) => {
-            setTodayLayout(next);
-            setLayoutSheet(false);
+      {change && (
+        <ChangeDetailSheet
+          change={change}
+          onClose={() => setChange(null)}
+          onOpenCourse={(next) => {
+            setChange(null);
+            setCourse(next);
           }}
-          onClose={() => setLayoutSheet(false)}
         />
       )}
       {termSheet && (
@@ -427,6 +501,8 @@ export function CloudApp() {
           onSelect={(term) => {
             setSelectedTerm(term);
             setCourse(null);
+            setChange(null);
+            setScheduleIntent(null);
             setTermSheet(false);
           }}
           onClose={() => setTermSheet(false)}

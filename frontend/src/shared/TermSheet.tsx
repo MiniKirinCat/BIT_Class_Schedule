@@ -17,38 +17,46 @@ export function TermSheet({
   onClose,
 }: TermSheetProps) {
   return (
-    <Sheet title="切换学期" onClose={onClose}>
-      <div className="term-list">
+    <Sheet
+      title="切换学期"
+      kicker="TERM · LOCAL ARCHIVE"
+      onClose={onClose}
+    >
+      <p className="sheet-note">
+        历史学期会在新学期第一次同步后自动保留，可随时切回查看课表、月历与变动。
+      </p>
+      <div className="session-list term-list">
         {archive.terms.map((term) => {
           const span = weekSpan(term.courses);
           const current = term.term === archive.current_term;
+          const viewing = term.term === selectedTerm;
           return (
             <button
               key={term.term}
               type="button"
-              className={`term-option ${term.term === selectedTerm ? 'is-selected' : ''}`}
-              aria-pressed={term.term === selectedTerm}
+              className={`session-item term-choice ${viewing ? 'is-selected' : ''}`}
+              aria-pressed={viewing}
               onClick={() => onSelect(term.term)}
             >
-              <span className="term-option-head">
+              <span className="session-item-main">
                 <strong>{term.term}</strong>
-                {current && <span className="term-current">当前学期</span>}
-                {term.term === selectedTerm && !current && (
-                  <span className="term-viewing">正在查看</span>
-                )}
+                <span>
+                  {termCourseCount(term)} 门课程
+                  {span ? ` · 第 ${span.first}–${span.last} 周` : ''}
+                </span>
+                <small>同步于 {formatDateTime(term.fetched_at)}</small>
               </span>
-              <span className="term-option-meta">
-                {termCourseCount(term)} 门课程
-                {span ? ` · 第 ${span.first}–${span.last} 周` : ''} · 同步于{' '}
-                {formatDateTime(term.fetched_at)}
-              </span>
+              {current ? (
+                <span className="term-current">当前学期</span>
+              ) : viewing ? (
+                <span className="term-viewing">正在查看</span>
+              ) : (
+                <span className="pill">归档</span>
+              )}
             </button>
           );
         })}
       </div>
-      <p className="form-hint">
-        历史学期会在新学期第一次同步后自动保留，可随时切回查看周课表和变动。
-      </p>
     </Sheet>
   );
 }

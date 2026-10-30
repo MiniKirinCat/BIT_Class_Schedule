@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import type { PageKey } from '../BottomNav';
+import type { PageKey } from '../../types';
 import { useAppShortcuts } from '../useAppShortcuts';
 
 function ShortcutHost() {
@@ -20,7 +20,7 @@ describe('app shortcuts', () => {
   it('navigates with single-letter shortcuts', async () => {
     render(<ShortcutHost />);
     await userEvent.keyboard('w');
-    expect(screen.getByText('week')).toBeInTheDocument();
+    expect(screen.getByText('schedule')).toBeInTheDocument();
     await userEvent.keyboard('c');
     expect(screen.getByText('changes')).toBeInTheDocument();
     await userEvent.keyboard('t');

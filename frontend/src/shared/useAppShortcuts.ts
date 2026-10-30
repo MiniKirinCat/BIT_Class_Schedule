@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { PageKey } from './BottomNav';
+import type { PageKey } from '../types';
 
 interface AppShortcutsOptions {
   onNavigate: (page: PageKey) => void;
@@ -38,7 +38,7 @@ export function useAppShortcuts({
           onNavigate('today');
           break;
         case 'w':
-          onNavigate('week');
+          onNavigate('schedule');
           break;
         case 'c':
           onNavigate('changes');

@@ -1,12 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { AppStatus } from '../../data/types';
 import type { CourseSession, ScheduleSnapshot } from '../../types';
 import { TodayPage } from '../TodayPage';
-import { StaleBadge } from '../StaleBadge';
 import { CourseDetailSheet } from '../today/CourseDetailSheet';
-import { LayoutSheet } from '../today/LayoutSheet';
 
 const COURSE: CourseSession = {
   course_code: 'MATH101',
@@ -46,7 +43,14 @@ const SNAPSHOT: ScheduleSnapshot = {
   first_day: '2026-08-31',
   courses: [
     COURSE,
-    { ...COURSE, course_code: 'PHY101', course_name: '大学物理', room: 'B202', start_period: 3, end_period: 4 },
+    {
+      ...COURSE,
+      course_code: 'PHY101',
+      course_name: '大学物理',
+      room: 'B202',
+      start_period: 3,
+      end_period: 4,
+    },
   ],
   changes: [
     {
@@ -66,139 +70,112 @@ const SNAPSHOT: ScheduleSnapshot = {
 
 const NOW = new Date('2026-10-26T08:10:00+08:00');
 
-function renderToday(
-  layout: 'focus' | 'timeline' | 'compact',
-  options: { now?: Date; snapshot?: ScheduleSnapshot } = {},
-) {
+function renderToday(options: { now?: Date; snapshot?: ScheduleSnapshot } = {}) {
   const onOpenCourse = vi.fn();
-  const onOpenLayout = vi.fn();
+  const onOpenChange = vi.fn();
   const onOpenChanges = vi.fn();
-  const onGoWeek = vi.fn();
+  const onOpenWeek = vi.fn();
+  const onOpenDay = vi.fn();
+  const onOpenSemester = vi.fn();
   render(
     <TodayPage
       snapshot={options.snapshot ?? SNAPSHOT}
       now={options.now ?? NOW}
-      layout={layout}
       unreadCount={1}
       onOpenCourse={onOpenCourse}
-      onOpenLayout={onOpenLayout}
+      onOpenChange={onOpenChange}
       onOpenChanges={onOpenChanges}
-      onGoWeek={onGoWeek}
+      onOpenWeek={onOpenWeek}
+      onOpenDay={onOpenDay}
+      onOpenSemester={onOpenSemester}
     />,
   );
-  return { onOpenCourse, onOpenLayout, onOpenChanges, onGoWeek };
+  return {
+    onOpenCourse,
+    onOpenChange,
+    onOpenChanges,
+    onOpenWeek,
+    onOpenDay,
+    onOpenSemester,
+  };
 }
 
-describe('Today layouts', () => {
-  it('renders focus mode with the ongoing class', async () => {
-    const { onOpenCourse } = renderToday('focus');
-    expect(screen.getAllByText('正在上').length).toBeGreaterThan(0);
+describe('Today workbench', () => {
+  it('shows the ongoing class and opens it from the timeline', async () => {
+    const { onOpenCourse } = renderToday();
+    expect(screen.getAllByText(/正在上/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('高等数学').length).toBeGreaterThan(0);
 
-    await userEvent.click(screen.getByRole('button', { name: /正在上/ }));
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /高等数学/ })[0],
+    );
     expect(onOpenCourse).toHaveBeenCalledWith(COURSE);
   });
 
-  it('renders timeline mode and opens a course', async () => {
-    const { onOpenCourse } = renderToday('timeline');
-    expect(screen.getByText('今日概览')).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole('button', { name: /大学物理/ })[0]);
-    expect(onOpenCourse).toHaveBeenCalledWith(
-      expect.objectContaining({ course_code: 'PHY101' }),
+  it('opens the latest change and the full change feed', async () => {
+    const { onOpenChange, onOpenChanges } = renderToday();
+    await userEvent.click(
+      screen.getByRole('button', { name: /高等数学：调整/ }),
     );
-  });
-
-  it('renders compact mode with summary blocks', () => {
-    renderToday('compact');
-    expect(screen.getByText('下一节')).toBeInTheDocument();
-    expect(screen.getByText('今日节数')).toBeInTheDocument();
-    expect(screen.getByText('变动数')).toBeInTheDocument();
-  });
-
-  it('connects the change banner and layout button', async () => {
-    const { onOpenChanges, onOpenLayout } = renderToday('focus');
-    await userEvent.click(screen.getByRole('button', { name: /1 条新变动/ }));
+    expect(onOpenChange).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /1 项/ }));
     expect(onOpenChanges).toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: '布局' }));
-    expect(onOpenLayout).toHaveBeenCalled();
+  });
+
+  it('opens the week and semester views from the rail', async () => {
+    const { onOpenWeek, onOpenDay, onOpenSemester } = renderToday();
+    await userEvent.click(
+      screen.getByRole('button', { name: /查看本周课表/ }),
+    );
+    expect(onOpenWeek).toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: /^一\s*26/ }));
+    expect(onOpenDay).toHaveBeenCalledWith(9, 1);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /第 9 \/ 20 周/ }),
+    );
+    expect(onOpenSemester).toHaveBeenCalled();
   });
 
   it('renders the finished state after the last class', () => {
-    renderToday('focus', { now: new Date('2026-10-26T12:30:00+08:00') });
-    expect(screen.getByText('今天的课结束了')).toBeInTheDocument();
+    renderToday({ now: new Date('2026-10-26T12:30:00+08:00') });
+    expect(screen.getByText('今天已结束')).toBeInTheDocument();
+    expect(screen.getByText('今天的课已结束')).toBeInTheDocument();
+    expect(screen.getByText('今天的安排已完成')).toBeInTheDocument();
+    expect(screen.getByText(/节已上/)).toBeInTheDocument();
+    expect(screen.queryByText('今天没有课')).not.toBeInTheDocument();
   });
 
   it('renders the empty state when no course matches today', () => {
-    renderToday('focus', {
+    renderToday({
       snapshot: { ...SNAPSHOT, courses: [] },
       now: new Date('2026-10-26T09:00:00+08:00'),
     });
-    expect(screen.getByText('今天没课')).toBeInTheDocument();
+    expect(screen.getAllByText('今天没有课').length).toBeGreaterThan(0);
   });
 
   it('shows the next course when today has no classes', () => {
-    renderToday('focus', {
+    renderToday({
       now: new Date('2026-10-25T09:00:00+08:00'),
     });
-    expect(screen.getByText('下一节')).toBeInTheDocument();
-    expect(screen.getByText('高等数学')).toBeInTheDocument();
+    expect(screen.getByText('接下来')).toBeInTheDocument();
+    expect(screen.getAllByText('高等数学').length).toBeGreaterThan(0);
   });
 
-  it('marks stale snapshots in the header badge', () => {
-    render(
-      <StaleBadge
-        snapshot={{ ...SNAPSHOT, synced_at: '2020-01-01T08:00:00+08:00' }}
-      />,
-    );
-    expect(screen.getByText('数据可能已过期')).toBeInTheDocument();
-  });
 
-  it('surfaces a failed sync and cloud status in the header badge', () => {
-    const status: AppStatus = {
-      configured: true,
-      school_configured: true,
-      school_username: '20250001',
-      push_configured: false,
-      cloud_configured: true,
-      cloud_pages_url: 'https://alice.github.io/next-class/',
-      cloud_gist_id: 'gist-1',
-      cloud_last_publish_at: SNAPSHOT.synced_at,
-      cloud_last_error: null,
-      cloud_qr_ready: true,
-      last_sync_at: SNAPSHOT.synced_at,
-      last_attempt_at: SNAPSHOT.synced_at,
-      next_due_at: null,
-      sync_status: 'failed',
-      last_error: '登录失败',
-      notification_error: null,
-      cloud_status: 'failed',
-      version: '0.1.0',
-    };
-    const { rerender } = render(<StaleBadge snapshot={SNAPSHOT} status={status} />);
-    expect(screen.getByText(/同步异常/)).toBeInTheDocument();
 
-    rerender(
-      <StaleBadge
-        snapshot={SNAPSHOT}
-        status={{ ...status, sync_status: 'success' }}
-      />,
-    );
-    expect(screen.getByText(/云端未更新/)).toBeInTheDocument();
-  });
 });
 
-describe('sheets', () => {
-  it('selects a Today layout', async () => {
-    const onSelect = vi.fn();
-    render(<LayoutSheet layout="focus" onSelect={onSelect} onClose={vi.fn()} />);
-    await userEvent.click(screen.getByRole('button', { name: /时间轴/ }));
-    expect(onSelect).toHaveBeenCalledWith('timeline');
-  });
-
+describe('course sheet', () => {
   it('shows course details and closes with Escape', async () => {
     const onClose = vi.fn();
     render(<CourseDetailSheet course={COURSE} onClose={onClose} />);
-    expect(screen.getByRole('heading', { name: '高等数学' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '高等数学' }),
+    ).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
