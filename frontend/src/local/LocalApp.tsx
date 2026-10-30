@@ -12,6 +12,7 @@ import type {
   PageKey,
   PageMeta,
   ScheduleArchive,
+  ThemeName,
   WeekLayout,
 } from '../types';
 import type { AppStatus } from '../data/types';
@@ -36,6 +37,7 @@ import {
   writeLastSeenChangeId,
   defaultWeekLayout,
 } from '../lib/storage';
+import { applyTheme, THEME_NAMES } from '../lib/theme';
 import { AppShell } from '../shared/AppShell';
 import { useAppShortcuts } from '../shared/useAppShortcuts';
 import { TodayPage } from '../shared/TodayPage';
@@ -83,12 +85,21 @@ export function LocalApp() {
     defaultWeekLayout(),
     ['grid', 'list'] as const,
   );
+  const [theme, setTheme] = useStoredChoice<ThemeName>(
+    STORAGE_KEYS.theme,
+    'paper',
+    THEME_NAMES,
+  );
 
   useAppShortcuts({ onNavigate: setPage });
 
   useEffect(() => {
     document.documentElement.dataset.mode = mode;
   }, [mode]);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   const refresh = useCallback(async () => {
     setLoadError('');
@@ -288,6 +299,8 @@ export function LocalApp() {
         status={status}
         mode={mode}
         onModeChange={setMode}
+        theme={theme}
+        onThemeChange={setTheme}
         onRelogin={() => setShowSetup(true)}
         onSync={handleSync}
         onRefresh={refresh}

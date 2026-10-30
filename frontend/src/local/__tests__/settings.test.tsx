@@ -47,12 +47,17 @@ const STATUS: AppStatus = {
   version: '0.1.0',
 };
 
-function renderSettings() {
+function renderSettings(
+  theme: 'paper' | 'celadon' | 'mist' | 'plum' = 'paper',
+  onThemeChange = vi.fn(),
+) {
   return render(
     <SettingsPage
       status={STATUS}
       mode="workbench"
       onModeChange={vi.fn()}
+      theme={theme}
+      onThemeChange={onThemeChange}
       onRelogin={vi.fn()}
       onSync={vi.fn()}
       onRefresh={vi.fn()}
@@ -140,6 +145,19 @@ beforeEach(() => {
 });
 
 describe('Settings diagnostics and notifications', () => {
+  it('offers all four color themes and reports the choice', async () => {
+    const onThemeChange = vi.fn();
+    renderSettings('paper', onThemeChange);
+    expect(screen.getByRole('button', { name: /纸页/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /青瓷/ }));
+    expect(onThemeChange).toHaveBeenCalledWith('celadon');
+    expect(screen.getByRole('button', { name: /雾蓝/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /绛陶/ })).toBeInTheDocument();
+  });
+
   it('shows Server酱 instead of PushPlus and loads sync history', async () => {
     renderSettings();
     expect(await screen.findByText('Server酱')).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { AppMode, ScheduleSnapshot, WeekLayout } from '../types';
+import type { AppMode, ScheduleSnapshot, ThemeName, WeekLayout } from '../types';
 import { formatDateTime } from '../lib/schedule';
+import { ThemePicker } from '../shared/ThemePicker';
 import { maskSnapshotUrl, type CloudConfig } from './protocol';
 
 interface DevicePageProps {
@@ -12,9 +13,11 @@ interface DevicePageProps {
   lastPullAt: string | null;
   mode: AppMode;
   weekLayout: WeekLayout;
+  theme: ThemeName;
   refreshBusy: boolean;
   onModeChange: (mode: AppMode) => void;
   onWeekLayoutChange: (layout: WeekLayout) => void;
+  onThemeChange: (theme: ThemeName) => void;
   onRefresh: () => void;
   onDisconnect: () => void;
 }
@@ -28,9 +31,11 @@ export function DevicePage({
   lastPullAt,
   mode,
   weekLayout,
+  theme,
   refreshBusy,
   onModeChange,
   onWeekLayoutChange,
+  onThemeChange,
   onRefresh,
   onDisconnect,
 }: DevicePageProps) {
@@ -165,6 +170,15 @@ export function DevicePage({
               <option value="list">单日列表</option>
             </select>
           </label>
+        </section>
+
+        <section className="card settings-section">
+          <div className="eyebrow">APPEARANCE</div>
+          <h2>外观</h2>
+          <p className="section-note">
+            四套配色共用纸页布局与衬线标题；只会改变色彩，深色模式跟随系统。
+          </p>
+          <ThemePicker value={theme} onChange={onThemeChange} />
         </section>
 
         <section className="card settings-section">

@@ -30,8 +30,19 @@ test('mobile workbench, merged schedule, changes, and settings', async ({ page }
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '外观' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '桌面形态' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '雾蓝' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '暖纸' })).toHaveCount(0);
+
+  const themes = page.getByRole('group', { name: '配色主题' });
+  await expect(themes).toBeVisible();
+  for (const [label, value] of [
+    ['青瓷', 'celadon'],
+    ['雾蓝', 'mist'],
+    ['绛陶', 'plum'],
+  ] as const) {
+    await themes.getByRole('button', { name: new RegExp(label) }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', value);
+  }
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'plum');
 });
 
 test('week search and keyboard navigation', async ({ page }) => {
@@ -113,7 +124,7 @@ test('settings shows diagnostics, preflight, and startup controls', async ({ pag
   await expect(page.getByText('测试发布说明')).toBeVisible();
   await expect(page.getByRole('link', { name: '打开发布页面' })).toHaveAttribute(
     'href',
-    /releases\/tag\/v1\.3\.1/,
+    /releases\/tag\/v1\.4\.1/,
   );
 });
 

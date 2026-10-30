@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { AppMode } from '../types';
+import type { AppMode, ThemeName } from '../types';
 import type {
   AppSettings,
   AppStatus,
@@ -11,6 +11,7 @@ import type {
 import { api, messageFromError } from '../data/local';
 import { formatDateTime } from '../lib/schedule';
 import { PreflightSummary } from '../shared/PreflightSummary';
+import { ThemePicker } from '../shared/ThemePicker';
 
 const RUN_STATUS_LABELS: Record<string, string> = {
   success: '正常',
@@ -37,6 +38,8 @@ interface SettingsPageProps {
   status: AppStatus;
   mode: AppMode;
   onModeChange: (mode: AppMode) => void;
+  theme: ThemeName;
+  onThemeChange: (theme: ThemeName) => void;
   onRelogin: () => void;
   onSync: () => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -48,6 +51,8 @@ export function SettingsPage({
   status,
   mode,
   onModeChange,
+  theme,
+  onThemeChange,
   onRelogin,
   onSync,
   onRefresh,
@@ -310,21 +315,10 @@ export function SettingsPage({
           <div className="eyebrow">APPEARANCE</div>
           <h2>外观</h2>
           <p className="section-note">
-            “纸页”是这一版唯一的视觉主题：暖白纸张、深绿主色与衬线标题。
-            深色模式跟随系统，不需要手动切换。
+            四套配色共用纸页布局与衬线标题，只会改变色彩；深色模式跟随系统。
+            课程颜色保持稳定，换主题后仍能快速认出同一门课。
           </p>
-          <div className="theme-paper-card">
-            <span className="theme-paper-swatch" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            <span>
-              <strong>纸页 · 暖白 / 深绿</strong>
-              <small>当前主题 · 自动适配系统深色</small>
-            </span>
-            <span className="pill is-active">使用中</span>
-          </div>
+          <ThemePicker value={theme} onChange={onThemeChange} />
         </section>
 
         <section className="settings-section card">

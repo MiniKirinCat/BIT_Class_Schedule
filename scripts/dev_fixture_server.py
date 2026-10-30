@@ -122,7 +122,7 @@ def fixture_snapshot():
     ]
     return {
         "schema_version": 2,
-        "app_version": "1.3.0",
+        "app_version": "1.4.0",
         "synced_at": now.isoformat(timespec="seconds"),
         "sync_interval_days": 1,
         "current_term": "2026-2027-1",
@@ -188,7 +188,7 @@ def status():
         "last_error": None,
         "notification_error": None,
         "cloud_status": "skipped",
-        "version": "1.3.0",
+        "version": "1.4.0",
     }
 
 
@@ -197,11 +197,11 @@ def update_check():
     now = datetime.now(TZ)
     return {
         "status": "ok",
-        "current_version": "1.3.0",
-        "latest_version": "v1.3.1",
+        "current_version": "1.4.0",
+        "latest_version": "v1.4.1",
         "update_available": True,
-        "release_url": "https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v1.3.1",
-        "release_name": "下一节 1.3.1",
+        "release_url": "https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v1.4.1",
+        "release_name": "下一节 1.4.1",
         "published_at": now.isoformat(timespec="seconds"),
         "notes": "测试发布说明",
         "checked_at": now.isoformat(timespec="seconds"),
@@ -275,7 +275,7 @@ def diagnostics():
         "format": "next-class-diagnostics",
         "version": 1,
         "generated_at": now.isoformat(timespec="seconds"),
-        "app_version": "1.3.0",
+        "app_version": "1.4.0",
         "platform": {
             "system": "Windows",
             "release": "fixture",

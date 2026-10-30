@@ -151,10 +151,10 @@ def test_update_check_endpoint_returns_release_state(tmp_path, monkeypatch):
         lambda version: {
             "status": "ok",
             "current_version": version,
-            "latest_version": "v1.3.0",
+            "latest_version": "v1.4.1",
             "update_available": True,
-            "release_url": "https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v1.3.0",
-            "release_name": "下一节 1.3.0",
+            "release_url": "https://github.com/MiniKirinCat/BIT_Class_Schedule/releases/tag/v1.4.1",
+            "release_name": "下一节 1.4.1",
             "published_at": "2026-10-29T10:00:00Z",
             "notes": None,
             "checked_at": "2026-10-29T10:00:00+08:00",
@@ -166,7 +166,7 @@ def test_update_check_endpoint_returns_release_state(tmp_path, monkeypatch):
         assert response.status_code == 200
         body = response.json()
         assert body["current_version"] == AppConfig().app_version
-        assert body["latest_version"] == "v1.3.0"
+        assert body["latest_version"] == "v1.4.1"
         assert body["update_available"] is True
 
 

@@ -41,7 +41,7 @@ function fixtureSnapshot() {
 
   return {
     schema_version: 2,
-    app_version: '1.3.0',
+    app_version: '1.4.0',
     synced_at: now,
     sync_interval_days: 1,
     current_term: '2026-2027-1',
@@ -189,6 +189,10 @@ test('cloud PWA imports a QR fragment, decrypts and falls back to cache', async 
   await expect(page.getByText('云端最新快照')).toBeVisible();
   await expect(page.getByText(/2 个学期/)).toBeVisible();
   await expect(page.getByText('离线应用壳', { exact: true })).toBeVisible();
+  const themes = page.getByRole('group', { name: '配色主题' });
+  await expect(themes).toBeVisible();
+  await themes.getByRole('button', { name: /青瓷/ }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'celadon');
   await page.getByRole('button', { name: '专注' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-mode', 'focus');
   await page.getByRole('button', { name: '工作台' }).click();
@@ -198,6 +202,7 @@ test('cloud PWA imports a QR fragment, decrypts and falls back to cache', async 
   await page.route('https://api.github.com/**', (route) => route.abort());
   await page.reload();
   await expect(page.getByText('正在显示缓存快照')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'celadon');
 });
 
 test('cloud PWA switches to an archived term and back', async ({ page }) => {

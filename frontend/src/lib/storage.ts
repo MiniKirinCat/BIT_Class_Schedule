@@ -4,6 +4,7 @@ import type { AppMode, WeekLayout } from '../types';
 export const STORAGE_KEYS = {
   appMode: 'next-class.appMode',
   weekLayout: 'next-class.weekLayout',
+  theme: 'next-class.theme',
   lastSeenChangeId: 'next-class.lastSeenChangeId',
 } as const;
 

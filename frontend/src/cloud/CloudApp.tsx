@@ -12,6 +12,7 @@ import type {
   PageKey,
   PageMeta,
   ScheduleArchive,
+  ThemeName,
   WeekLayout,
 } from '../types';
 import {
@@ -36,6 +37,7 @@ import {
   useStoredChoice,
   writeLastSeenChangeId,
 } from '../lib/storage';
+import { applyTheme, THEME_NAMES } from '../lib/theme';
 import { AppShell } from '../shared/AppShell';
 import { useAppShortcuts } from '../shared/useAppShortcuts';
 import { TodayPage } from '../shared/TodayPage';
@@ -94,12 +96,21 @@ export function CloudApp() {
     defaultWeekLayout(),
     ['grid', 'list'] as const,
   );
+  const [theme, setTheme] = useStoredChoice<ThemeName>(
+    STORAGE_KEYS.theme,
+    'paper',
+    THEME_NAMES,
+  );
 
   useAppShortcuts({ onNavigate: setPage, cloudMode: true });
 
   useEffect(() => {
     document.documentElement.dataset.mode = mode;
   }, [mode]);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     if (page !== 'schedule') setScheduleMeta(null);
@@ -230,6 +241,7 @@ export function CloudApp() {
     for (const key of Object.values(STORAGE_KEYS)) removeStorage(key);
     setMode('workbench');
     setWeekLayout(defaultWeekLayout());
+    setTheme('paper');
     setLastSeenId(0);
     setConfig(null);
     setArchive(null);
@@ -244,7 +256,7 @@ export function CloudApp() {
     setPage('today');
     setLoading(false);
     setInitialized(true);
-  }, [setMode, setWeekLayout]);
+  }, [setMode, setWeekLayout, setTheme]);
 
   const refresh = useCallback(() => {
     if (config && !loadingRef.current) void load(config);
@@ -396,9 +408,11 @@ export function CloudApp() {
         lastPullAt={lastPullAt}
         mode={mode}
         weekLayout={weekLayout}
+        theme={theme}
         refreshBusy={loading}
         onModeChange={setMode}
         onWeekLayoutChange={setWeekLayout}
+        onThemeChange={setTheme}
         onRefresh={refresh}
         onDisconnect={disconnect}
       />

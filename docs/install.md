@@ -65,7 +65,7 @@ Copy-Item .\data\next_class.db* $target
 发布页会同时给出安装包的 SHA256。可以在 PowerShell 中核对：
 
 ```powershell
-Get-FileHash .\NextClass-Setup-1.3.0.exe -Algorithm SHA256
+Get-FileHash .\NextClass-Setup-1.4.0.exe -Algorithm SHA256
 ```
 
 哈希一致只说明文件没有被改动，不代表发布者购买了代码签名。只从本仓库的 Releases 下载安装包。
@@ -217,13 +217,13 @@ README.md
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build_installer.ps1
-Get-FileHash .\dist\NextClass-Setup-1.3.0.exe -Algorithm SHA256
+Get-FileHash .\dist\NextClass-Setup-1.4.0.exe -Algorithm SHA256
 ```
 
 建议先在临时目录做一次静默安装/卸载检查：
 
 ```powershell
-.\dist\NextClass-Setup-1.3.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART `
+.\dist\NextClass-Setup-1.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART `
   "/DIR=$PWD\.build\install-check" /LOG="$PWD\.build\install-check.log"
 & "$PWD\.build\install-check\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 ```
@@ -236,17 +236,17 @@ Get-FileHash .\dist\NextClass-Setup-1.3.0.exe -Algorithm SHA256
 
 ```powershell
 git add backend/app/config.py frontend/package.json
-git -c user.name="白泽" -c user.email="minikirincat@outlook.com" commit -m "chore: release 1.3.0"
+git -c user.name="白泽" -c user.email="minikirincat@outlook.com" commit -m "chore: release 1.4.0"
 git -c user.name="白泽" -c user.email="minikirincat@outlook.com" push origin master
 ```
 
 然后创建标签和 Release，把安装包作为附件上传：
 
 ```powershell
-git tag v1.3.0
-git push origin v1.3.0
-gh release create v1.3.0 "dist\NextClass-Setup-1.3.0.exe" `
-  --title "下一节 1.3.0" `
+git tag v1.4.0
+git push origin v1.4.0
+gh release create v1.4.0 "dist\NextClass-Setup-1.4.0.exe" `
+  --title "下一节 1.4.0" `
   --notes "本次更新内容和使用说明。`n`n安装包 SHA256：<粘贴哈希>"
 ```
 

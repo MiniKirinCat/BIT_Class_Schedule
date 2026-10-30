@@ -1,6 +1,7 @@
 export type PageKey = 'today' | 'schedule' | 'changes' | 'settings' | 'device';
 export type AppMode = 'workbench' | 'focus';
 export type WeekLayout = 'grid' | 'list';
+export type ThemeName = 'paper' | 'celadon' | 'mist' | 'plum';
 export type ScheduleView = 'week' | 'month' | 'semester';
 export type SemesterView = 'overview' | 'timeline';
 export type SyncStatus = 'success' | 'failed' | 'anomaly' | 'running' | null;
