@@ -14,6 +14,7 @@ import type {
   WeekLayout,
 } from '../../types';
 import { weekChangeState } from '../../lib/changeView';
+import { STORAGE_KEYS, useStoredChoice } from '../../lib/storage';
 import {
   coursesForWeek,
   currentWeek,
@@ -27,6 +28,7 @@ import {
   weekdayOf,
 } from '../../lib/schedule';
 import { Icon } from '../Icon';
+import { GlobalSearchResults, searchSnapshot } from './GlobalSearchResults';
 import { MonthView } from './MonthView';
 import { SemesterView } from './SemesterView';
 import { WeekBoard } from './WeekBoard';
@@ -70,20 +72,6 @@ function monthKicker(monthKey: string): string {
     .toUpperCase();
 }
 
-function matchesQuery(course: CourseSession, query: string): boolean {
-  if (!query) return true;
-  return [
-    course.course_name,
-    course.course_code,
-    course.teacher,
-    course.room,
-    course.campus,
-  ]
-    .join(' ')
-    .toLowerCase()
-    .includes(query);
-}
-
 export function SchedulePage({
   snapshot,
   today,
@@ -99,7 +87,11 @@ export function SchedulePage({
     ? 1
     : clamp(currentWeek(snapshot, today), 1, totalWeeks);
   const anchorDate = archived ? snapshot.first_day : today;
-  const [view, setView] = useState<ScheduleView>(intent?.view ?? 'week');
+  const [view, setView] = useStoredChoice<ScheduleView>(
+    STORAGE_KEYS.scheduleView,
+    'week',
+    ['week', 'month', 'semester'] as const,
+  );
   const [week, setWeek] = useState(
     clamp(intent?.week ?? anchorWeek, 1, totalWeeks),
   );
@@ -121,31 +113,25 @@ export function SchedulePage({
     setSearch('');
   }, [intent, totalWeeks]);
 
-  const query = search.trim().toLowerCase();
-  const hasSearch = query.length > 0;
-  const filteredCourses = hasSearch
-    ? snapshot.courses.filter((course) => matchesQuery(course, query))
-    : snapshot.courses;
+  const hasSearch = search.trim().length > 0;
+  const searchResults = hasSearch ? searchSnapshot(snapshot, search) : null;
   const changes = weekChangeState(snapshot, week);
-  const filteredCancelled = hasSearch
-    ? changes.cancelled.filter((course) => matchesQuery(course, query))
-    : changes.cancelled;
-  const visibleCount =
-    coursesForWeek(
-      { ...snapshot, courses: filteredCourses },
-      week,
-    ).length + filteredCancelled.length;
 
   const meta = useCallback((): PageMeta => {
+    if (hasSearch && searchResults) {
+      return {
+        kicker: `SEARCH · ${searchResults.groups.length} COURSES`,
+        title: '课表',
+        subtitle: `搜索「${search.trim()}」· ${searchResults.groups.length} 门课程 · ${searchResults.totalSessions} 次安排`,
+      };
+    }
     if (view === 'week') {
       return {
         kicker: `TIMETABLE · WEEK ${String(week).padStart(2, '0')}`,
         title: '课表',
-        subtitle: hasSearch
-          ? `搜索「${search.trim()}」· ${visibleCount} 个结果`
-          : `${formatWeekRange(weekDates(snapshot.first_day, week))} · ${
-              coursesForWeek(snapshot, week).length
-            } 节课程`,
+        subtitle: `${formatWeekRange(weekDates(snapshot.first_day, week))} · ${
+          coursesForWeek(snapshot, week).length
+        } 节课程`,
       };
     }
     if (view === 'month') {
@@ -167,10 +153,10 @@ export function SchedulePage({
     hasSearch,
     monthKey,
     search,
+    searchResults,
     snapshot,
     totalWeeks,
     view,
-    visibleCount,
     week,
   ]);
 
@@ -313,7 +299,40 @@ export function SchedulePage({
         </div>
       </div>
 
-      {view === 'week' && (
+      <div className="schedule-search-row">
+        <div className="search-box global-search">
+          <Icon name="search" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            placeholder="搜索全部课程、教师、教室或校区"
+            aria-label="搜索全部课程、教师、教室或校区"
+            autoComplete="off"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {search && (
+            <button
+              type="button"
+              className="search-clear"
+              aria-label="清除搜索"
+              onClick={() => {
+                setSearch('');
+                searchRef.current?.focus();
+              }}
+            >
+              <Icon name="close" />
+            </button>
+          )}
+        </div>
+        <span className="search-hint">
+          {hasSearch
+            ? '全局结果 · 点击任一段定位'
+            : '跨周搜索 · 支持课程、教师、教室、校区'}
+        </span>
+      </div>
+
+      {!hasSearch && view === 'week' && (
         <div className="schedule-subhead">
           <div className="week-toolbar">
             <button
@@ -359,44 +378,11 @@ export function SchedulePage({
                 单日
               </button>
             </div>
-            <div className="search-box">
-              <Icon name="search" />
-              <input
-                ref={searchRef}
-                type="text"
-                value={search}
-                placeholder="搜索课程、老师或教室"
-                aria-label="搜索课程、教师或教室"
-                autoComplete="off"
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="search-clear"
-                  aria-label="清除搜索"
-                  onClick={() => {
-                    setSearch('');
-                    searchRef.current?.focus();
-                  }}
-                >
-                  <Icon name="close" />
-                </button>
-              )}
-            </div>
           </div>
-          {hasSearch && (
-            <p className="search-meta">
-              找到 {filteredCourses.length} 门课程
-              {filteredCourses.length > 0 && visibleCount === 0
-                ? ' · 本周没有安排，试试切换周次'
-                : ''}
-            </p>
-          )}
         </div>
       )}
 
-      {view === 'month' && (
+      {!hasSearch && view === 'month' && (
         <div className="schedule-subhead">
           <div className="month-toolbar">
             <button
@@ -426,10 +412,24 @@ export function SchedulePage({
         </div>
       )}
 
-      {view === 'week' && (
+      {hasSearch && searchResults ? (
+        <div className="schedule-stage">
+          <GlobalSearchResults
+            snapshot={snapshot}
+            query={search}
+            results={searchResults}
+            anchorWeek={anchorWeek}
+            onJump={jumpToWeek}
+            onClear={() => {
+              setSearch('');
+              searchRef.current?.focus();
+            }}
+          />
+        </div>
+      ) : view === 'week' ? (
         <div
           className={`schedule-stage week-stage ${
-            weekLayout === 'list' ? 'is-list' : ''
+            weekLayout === 'list' ? 'is-list' : 'is-grid'
           }`}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
@@ -441,10 +441,10 @@ export function SchedulePage({
             snapshot={snapshot}
             week={week}
             today={today}
-            courses={filteredCourses.filter((course) =>
+            courses={snapshot.courses.filter((course) =>
               course.weeks.includes(week),
             )}
-            cancelled={filteredCancelled}
+            cancelled={changes.cancelled}
             flags={changes.flags}
             onOpenCourse={onOpenCourse}
           />
@@ -453,26 +453,16 @@ export function SchedulePage({
             week={week}
             weekday={weekday}
             today={today}
-            courses={filteredCourses.filter((course) =>
+            courses={snapshot.courses.filter((course) =>
               course.weeks.includes(week),
             )}
-            cancelled={filteredCancelled.filter((course) =>
-              course.weeks.includes(week),
-            )}
+            cancelled={changes.cancelled}
             flags={changes.flags}
-            hasSearch={hasSearch}
             onSelectDay={setWeekday}
             onOpenCourse={onOpenCourse}
           />
-          {hasSearch && visibleCount === 0 && (
-            <div className="week-empty-note">
-              没有找到与「{search.trim()}」相关的课程
-            </div>
-          )}
         </div>
-      )}
-
-      {view === 'month' && (
+      ) : view === 'month' ? (
         <div className="schedule-stage">
           <MonthView
             snapshot={snapshot}
@@ -483,9 +473,7 @@ export function SchedulePage({
             onOpenCourse={onOpenCourse}
           />
         </div>
-      )}
-
-      {view === 'semester' && (
+      ) : (
         <div className="schedule-stage">
           <SemesterView
             snapshot={snapshot}
@@ -499,6 +487,7 @@ export function SchedulePage({
           />
         </div>
       )}
+
     </section>
   );
 }

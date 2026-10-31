@@ -18,7 +18,6 @@ interface WeekDayListProps {
   courses: CourseSession[];
   cancelled: CourseSession[];
   flags: Map<string, string>;
-  hasSearch: boolean;
   onSelectDay: (weekday: number) => void;
   onOpenCourse: (course: CourseSession) => void;
 }
@@ -36,7 +35,6 @@ export function WeekDayList({
   courses,
   cancelled,
   flags,
-  hasSearch,
   onSelectDay,
   onOpenCourse,
 }: WeekDayListProps) {
@@ -84,10 +82,8 @@ export function WeekDayList({
       <div className="day-list">
         {dayCourses.length === 0 && dayCancelled.length === 0 ? (
           <div className="empty-state">
-            <strong>{hasSearch ? '没有匹配课程' : '这天没有课'}</strong>
-            <span>
-              {hasSearch ? '换个关键词，或者切换日期。' : '留一点空白，或者去月历看看。'}
-            </span>
+            <strong>这天没有课</strong>
+            <span>留一点空白，或者去月历看看。</span>
           </div>
         ) : (
           <>

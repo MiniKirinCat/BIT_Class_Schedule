@@ -3,6 +3,11 @@
   --font-display: "Iowan Old Style", "Palatino Linotype", "Songti SC", "STSong", "SimSun", serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", "Consolas", monospace;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --display-weight: 700;
+  --display-tracking: -0.045em;
+  --course-shift: 0;
+  --course-sat: 38%;
+  --course-light: 38%;
 
   color-scheme: light;
   --bg: #f2eee3;
@@ -12,8 +17,8 @@
   --surface-2: #f5efe2;
   --ink: #1c2b25;
   --text: #1c2b25;
-  --muted: #6e7065;
-  --faint: #a3a396;
+  --muted: #63655a;
+  --faint: #8a8b7e;
   --line: #d8d0bf;
   --border: #d8d0bf;
   --line-strong: #b9b09c;
@@ -87,6 +92,8 @@
     --shadow: 0 24px 60px -40px rgba(0, 0, 0, 0.9);
     --shadow-soft: 0 14px 34px -26px rgba(0, 0, 0, 0.75);
     --grain-opacity: 0.1;
+    --course-sat: 44%;
+    --course-light: 70%;
     --scrim: rgba(0, 0, 0, 0.62);
     --nav-bg: rgba(20, 23, 19, 0.92);
     --ambient-1: rgba(66, 82, 70, 0.35);
@@ -102,8 +109,8 @@ html[data-theme="celadon"] {
   --surface-2: #eef5ef;
   --ink: #1b2a28;
   --text: #1b2a28;
-  --muted: #65756f;
-  --faint: #9aa9a1;
+  --muted: #5b6b64;
+  --faint: #7d8d85;
   --line: #c9d8cf;
   --border: #c9d8cf;
   --line-strong: #a9beb4;
@@ -111,10 +118,10 @@ html[data-theme="celadon"] {
   --primary-strong: #1a4f49;
   --primary-soft: #d5e7df;
   --on-primary: #f6fbf6;
-  --accent: #b45a3c;
+  --accent: #9d4b30;
   --accent-soft: #f0d9cf;
   --gold: #9a7a48;
-  --alert: #b4543c;
+  --alert: #9d4b30;
   --alert-soft: #f0d9cf;
   --focus: #296b63;
   --nav-active-bg: #d5e7df;
@@ -127,13 +134,22 @@ html[data-theme="celadon"] {
   --hero-line: rgba(242, 247, 239, 0.18);
   --hero-glow: rgba(213, 236, 224, 0.18);
   --hero-shadow: rgba(14, 47, 40, 0.85);
-  --shadow: 0 24px 60px -40px rgba(25, 60, 50, 0.5);
-  --shadow-soft: 0 14px 34px -26px rgba(25, 60, 50, 0.38);
+  --shadow: 0 22px 54px -38px rgba(25, 60, 50, 0.48);
+  --shadow-soft: 0 12px 30px -24px rgba(25, 60, 50, 0.34);
   --grain-opacity: 0.18;
   --scrim: rgba(15, 30, 26, 0.44);
   --nav-bg: rgba(233, 240, 234, 0.92);
   --ambient-1: rgba(255, 255, 250, 0.95);
   --ambient-2: rgba(187, 216, 201, 0.35);
+  --font-display: "Songti SC", "STSong", "Noto Serif CJK SC", "SimSun", serif;
+  --display-weight: 600;
+  --display-tracking: 0.012em;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-sm: 8px;
+  --course-shift: 8;
+  --course-sat: 34%;
+  --course-light: 36%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -173,6 +189,8 @@ html[data-theme="celadon"] {
     --shadow: 0 24px 60px -40px rgba(0, 0, 0, 0.9);
     --shadow-soft: 0 14px 34px -26px rgba(0, 0, 0, 0.75);
     --grain-opacity: 0.09;
+    --course-sat: 42%;
+    --course-light: 72%;
     --scrim: rgba(0, 0, 0, 0.62);
     --nav-bg: rgba(16, 24, 23, 0.92);
     --ambient-1: rgba(52, 80, 70, 0.35);
@@ -188,8 +206,8 @@ html[data-theme="mist"] {
   --surface-2: #eef3f8;
   --ink: #1c2733;
   --text: #1c2733;
-  --muted: #667383;
-  --faint: #9aa6b4;
+  --muted: #596777;
+  --faint: #7a8795;
   --line: #cdd6e0;
   --border: #cdd6e0;
   --line-strong: #adbac8;
@@ -197,10 +215,10 @@ html[data-theme="mist"] {
   --primary-strong: #244660;
   --primary-soft: #dbe6f0;
   --on-primary: #f7faff;
-  --accent: #b2673d;
+  --accent: #95512b;
   --accent-soft: #f1ddce;
   --gold: #a17b47;
-  --alert: #b05a42;
+  --alert: #95512b;
   --alert-soft: #f1ddce;
   --focus: #345a7a;
   --nav-active-bg: #dbe6f0;
@@ -213,13 +231,22 @@ html[data-theme="mist"] {
   --hero-line: rgba(242, 246, 251, 0.18);
   --hero-glow: rgba(210, 228, 247, 0.18);
   --hero-shadow: rgba(18, 38, 55, 0.85);
-  --shadow: 0 24px 60px -40px rgba(25, 45, 65, 0.48);
-  --shadow-soft: 0 14px 34px -26px rgba(25, 45, 65, 0.36);
-  --grain-opacity: 0.18;
+  --shadow: 0 18px 44px -34px rgba(25, 45, 65, 0.42);
+  --shadow-soft: 0 10px 26px -22px rgba(25, 45, 65, 0.3);
+  --grain-opacity: 0.1;
   --scrim: rgba(18, 30, 42, 0.45);
   --nav-bg: rgba(233, 237, 242, 0.92);
   --ambient-1: rgba(255, 255, 255, 0.95);
   --ambient-2: rgba(196, 214, 232, 0.4);
+  --font-display: "Avenir Next", "Futura", "Century Gothic", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --display-weight: 600;
+  --display-tracking: -0.035em;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-sm: 6px;
+  --course-shift: -8;
+  --course-sat: 30%;
+  --course-light: 40%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -259,6 +286,8 @@ html[data-theme="mist"] {
     --shadow: 0 24px 60px -40px rgba(0, 0, 0, 0.9);
     --shadow-soft: 0 14px 34px -26px rgba(0, 0, 0, 0.75);
     --grain-opacity: 0.08;
+    --course-sat: 40%;
+    --course-light: 72%;
     --scrim: rgba(0, 0, 0, 0.62);
     --nav-bg: rgba(16, 23, 32, 0.92);
     --ambient-1: rgba(48, 66, 86, 0.35);
@@ -274,8 +303,8 @@ html[data-theme="plum"] {
   --surface-2: #f5eae5;
   --ink: #2a2024;
   --text: #2a2024;
-  --muted: #78676d;
-  --faint: #ad9ba1;
+  --muted: #6f5e64;
+  --faint: #8e7c81;
   --line: #ddcec9;
   --border: #ddcec9;
   --line-strong: #c4aea8;
@@ -283,10 +312,10 @@ html[data-theme="plum"] {
   --primary-strong: #4e2b38;
   --primary-soft: #ecdbe1;
   --on-primary: #fff7f8;
-  --accent: #a76a2f;
+  --accent: #8f5622;
   --accent-soft: #f1ddc7;
   --gold: #a47b44;
-  --alert: #a94f3f;
+  --alert: #8f5622;
   --alert-soft: #f2d8d2;
   --focus: #6b3f4e;
   --nav-active-bg: #ecdbe1;
@@ -299,13 +328,22 @@ html[data-theme="plum"] {
   --hero-line: rgba(249, 239, 237, 0.18);
   --hero-glow: rgba(245, 219, 213, 0.16);
   --hero-shadow: rgba(54, 28, 36, 0.85);
-  --shadow: 0 24px 60px -40px rgba(60, 35, 42, 0.45);
-  --shadow-soft: 0 14px 34px -26px rgba(60, 35, 42, 0.34);
+  --shadow: 0 26px 62px -42px rgba(60, 35, 42, 0.45);
+  --shadow-soft: 0 16px 36px -28px rgba(60, 35, 42, 0.34);
   --grain-opacity: 0.2;
   --scrim: rgba(32, 20, 24, 0.46);
   --nav-bg: rgba(240, 233, 230, 0.92);
   --ambient-1: rgba(255, 252, 249, 0.95);
   --ambient-2: rgba(231, 204, 198, 0.4);
+  --font-display: "Kaiti SC", "STKaiti", "KaiTi", "FangSong", serif;
+  --display-weight: 500;
+  --display-tracking: 0.008em;
+  --radius: 22px;
+  --radius-lg: 30px;
+  --radius-sm: 14px;
+  --course-shift: 4;
+  --course-sat: 36%;
+  --course-light: 36%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -345,6 +383,8 @@ html[data-theme="plum"] {
     --shadow: 0 24px 60px -40px rgba(0, 0, 0, 0.9);
     --shadow-soft: 0 14px 34px -26px rgba(0, 0, 0, 0.75);
     --grain-opacity: 0.09;
+    --course-sat: 42%;
+    --course-light: 70%;
     --scrim: rgba(0, 0, 0, 0.62);
     --nav-bg: rgba(24, 18, 20, 0.92);
     --ambient-1: rgba(82, 52, 60, 0.35);

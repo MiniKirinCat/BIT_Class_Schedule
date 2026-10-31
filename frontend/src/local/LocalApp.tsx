@@ -12,6 +12,7 @@ import type {
   PageKey,
   PageMeta,
   ScheduleArchive,
+  SidebarState,
   ThemeName,
   WeekLayout,
 } from '../types';
@@ -90,6 +91,12 @@ export function LocalApp() {
     'paper',
     THEME_NAMES,
   );
+  const [sidebar, setSidebar] = useStoredChoice<SidebarState>(
+    STORAGE_KEYS.sidebar,
+    'expanded',
+    ['expanded', 'collapsed'] as const,
+  );
+  const themeTimer = useRef<number | null>(null);
 
   useAppShortcuts({ onNavigate: setPage });
 
@@ -98,8 +105,31 @@ export function LocalApp() {
   }, [mode]);
 
   useEffect(() => {
+    document.documentElement.dataset.sidebar = sidebar;
+  }, [sidebar]);
+
+  useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  const changeTheme = useCallback(
+    (next: ThemeName) => {
+      const root = document.documentElement;
+      root.classList.add('is-theme-switching');
+      if (themeTimer.current) window.clearTimeout(themeTimer.current);
+      themeTimer.current = window.setTimeout(
+        () => root.classList.remove('is-theme-switching'),
+        460,
+      );
+      setTheme(next);
+    },
+    [setTheme],
+  );
+
+  const toggleSidebar = useCallback(() => {
+    if (mode === 'focus') return;
+    setSidebar(sidebar === 'collapsed' ? 'expanded' : 'collapsed');
+  }, [mode, setSidebar, sidebar]);
 
   const refresh = useCallback(async () => {
     setLoadError('');
@@ -300,7 +330,9 @@ export function LocalApp() {
         mode={mode}
         onModeChange={setMode}
         theme={theme}
-        onThemeChange={setTheme}
+        onThemeChange={changeTheme}
+        sidebar={sidebar}
+        onToggleSidebar={toggleSidebar}
         onRelogin={() => setShowSetup(true)}
         onSync={handleSync}
         onRefresh={refresh}
@@ -391,6 +423,8 @@ export function LocalApp() {
         onChooseTerm={() => setTermSheet(true)}
         mode={mode}
         onModeChange={setMode}
+        sidebar={sidebar}
+        onToggleSidebar={toggleSidebar}
         unreadCount={unread}
         status={status}
         syncing={syncBusy}

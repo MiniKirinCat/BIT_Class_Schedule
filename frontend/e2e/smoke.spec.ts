@@ -29,7 +29,7 @@ test('mobile workbench, merged schedule, changes, and settings', async ({ page }
   await page.locator('.bottom-nav').getByRole('button', { name: '设置' }).click();
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '外观' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '桌面形态' })).toBeVisible();
+  await expect(page.locator('.desktop-layout-section')).toBeHidden();
 
   const themes = page.getByRole('group', { name: '配色主题' });
   await expect(themes).toBeVisible();
@@ -55,12 +55,20 @@ test('week search and keyboard navigation', async ({ page }) => {
   await expect(weekLabel).toHaveText(/第 \d+ 周/);
   const firstWeek = await weekLabel.textContent();
 
-  const search = page.getByLabel('搜索课程、教师或教室');
+  const search = page.getByLabel('搜索全部课程、教师、教室或校区');
   await search.fill('不存在');
-  await expect(page.getByText('找到 0 门课程')).toBeVisible();
-  await expect(page.locator('.week-empty-note')).toContainText('没有找到');
-  await page.getByRole('button', { name: '清除搜索' }).click();
-  await expect(page.locator('.search-meta')).toHaveCount(0);
+  await expect(page.getByText(/没有找到「不存在」/)).toBeVisible();
+  await expect(page.locator('.search-empty')).toBeVisible();
+  await page.locator('.search-clear').click();
+  await expect(page.locator('.search-results')).toHaveCount(0);
+
+  await search.fill('高等数学');
+  await expect(page.locator('.search-course').first()).toBeVisible();
+  const session = page.locator('.search-session').first();
+  await expect(session).toBeVisible();
+  await session.click();
+  await expect(page.locator('.search-results')).toHaveCount(0);
+  await expect(page.locator('.day-strip')).toBeVisible();
 
   await search.blur();
   await page.keyboard.press('ArrowRight');
@@ -110,21 +118,28 @@ test('settings shows diagnostics, preflight, and startup controls', async ({ pag
   await expect(page.getByRole('heading', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '诊断' })).toBeVisible();
   await expect(page.getByText('Server酱', { exact: true })).toBeVisible();
+
+  const diagnostics = page.locator('details.advanced-card', { hasText: '诊断' });
+  await diagnostics.locator('summary').click();
   await expect(page.getByText('课程 4')).toBeVisible();
 
   await page.getByRole('button', { name: '运行环境自检' }).click();
   await expect(page.getByText(/Windows 凭据管理器：可用/)).toBeVisible();
   await expect(page.getByText(/统一身份认证：可访问/)).toBeVisible();
 
+  const startupCard = page.locator('details.advanced-card', { hasText: '启动与退出' });
+  await startupCard.locator('summary').click();
   await page.getByRole('button', { name: '开启开机自启' }).click();
   await expect(page.getByRole('button', { name: '关闭开机自启' })).toBeVisible();
 
+  const aboutCard = page.locator('details.advanced-card', { hasText: '关于' });
+  await aboutCard.locator('summary').click();
   await page.getByRole('button', { name: '检查更新' }).click();
   await expect(page.getByText('最新版本', { exact: true })).toBeVisible();
   await expect(page.getByText('测试发布说明')).toBeVisible();
   await expect(page.getByRole('link', { name: '打开发布页面' })).toHaveAttribute(
     'href',
-    /releases\/tag\/v1\.4\.1/,
+    /releases\/tag\/v1\.5\.1/,
   );
 });
 
@@ -139,6 +154,46 @@ test.describe('desktop workspace', () => {
     await expect(page.getByRole('button', { name: /切换学期/ })).toBeVisible();
     const after = await nav.boundingBox();
     expect(after?.y).toBe(before?.y);
+  });
+
+  test('collapses the sidebar and remembers it', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.side-collapse')).toBeVisible();
+    await page.getByRole('button', { name: '收起侧栏' }).click();
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-sidebar',
+      'collapsed',
+    );
+    await expect(page.locator('.sidebar')).toHaveCSS('width', '84px');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-sidebar',
+      'collapsed',
+    );
+    await page.getByRole('button', { name: '展开侧栏' }).click();
+    await expect(page.locator('html')).toHaveAttribute(
+      'data-sidebar',
+      'expanded',
+    );
+  });
+
+  test('remembers the schedule view and week layout', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: '课表', exact: true }).click();
+    await page.getByRole('tab', { name: '月', exact: true }).click();
+    await expect(page.locator('.month-grid')).toBeVisible();
+    await page.reload();
+    await page.getByRole('button', { name: '课表', exact: true }).click();
+    await expect(page.locator('.month-grid')).toBeVisible();
+
+    await page.getByRole('tab', { name: '周', exact: true }).click();
+    await page.getByRole('button', { name: '单日' }).click();
+    await expect(page.locator('.week-stage')).toHaveClass(/is-list/);
+    await page.reload();
+    await page.getByRole('button', { name: '课表', exact: true }).click();
+    await expect(page.locator('.week-stage')).toHaveClass(/is-list/);
+    await page.getByRole('button', { name: '整周' }).click();
+    await expect(page.locator('.week-stage')).toHaveClass(/is-grid/);
   });
 
   test('grid schedule, focus mode, and course ICS', async ({ page }) => {

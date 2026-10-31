@@ -58,6 +58,8 @@ function renderSettings(
       onModeChange={vi.fn()}
       theme={theme}
       onThemeChange={onThemeChange}
+      sidebar="expanded"
+      onToggleSidebar={vi.fn()}
       onRelogin={vi.fn()}
       onSync={vi.fn()}
       onRefresh={vi.fn()}

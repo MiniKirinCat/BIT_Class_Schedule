@@ -5,6 +5,8 @@ export const STORAGE_KEYS = {
   appMode: 'next-class.appMode',
   weekLayout: 'next-class.weekLayout',
   theme: 'next-class.theme',
+  scheduleView: 'next-class.scheduleView',
+  sidebar: 'next-class.sidebar',
   lastSeenChangeId: 'next-class.lastSeenChangeId',
 } as const;
 
@@ -58,7 +60,7 @@ export function defaultWeekLayout(): WeekLayout {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return 'list';
   }
-  return window.matchMedia('(min-width: 920px)').matches ? 'grid' : 'list';
+  return window.matchMedia('(min-width: 921px)').matches ? 'grid' : 'list';
 }
 
 export function readLastSeenChangeId(): number {

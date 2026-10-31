@@ -25,6 +25,7 @@ export function BottomNav({
   const keys: PageKey[] = cloudMode
     ? ['today', 'schedule', 'changes', 'device']
     : ['today', 'schedule', 'changes', 'settings'];
+  const badgeLabel = unreadCount > 9 ? '9+' : String(unreadCount);
 
   return (
     <nav className="bottom-nav" aria-label="主导航">
@@ -40,7 +41,7 @@ export function BottomNav({
           >
             <span className="bottom-icon-wrap">
               <Icon name={item.icon} />
-              {key === 'changes' && unreadCount > 0 && <i>{unreadCount}</i>}
+              {key === 'changes' && unreadCount > 0 && <i>{badgeLabel}</i>}
             </span>
             <span>{item.label}</span>
           </button>

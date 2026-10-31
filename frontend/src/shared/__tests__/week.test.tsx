@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CourseSession, ScheduleSnapshot, WeekLayout } from '../../types';
 import { SchedulePage } from '../schedule/SchedulePage';
 
@@ -69,6 +69,11 @@ function renderSchedule(
 }
 
 describe('Schedule page', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
   it('renders week, month, and semester views in one page', async () => {
     renderSchedule();
     expect(screen.getAllByText('高等数学').length).toBeGreaterThan(0);
@@ -111,10 +116,31 @@ describe('Schedule page', () => {
 
   it('filters courses by search and clears the query', async () => {
     renderSchedule();
-    const search = screen.getByLabelText('搜索课程、教师或教室');
+    const search = screen.getByLabelText('搜索全部课程、教师、教室或校区');
     await userEvent.type(search, '不存在');
-    expect(screen.getByText(/没有找到与「不存在」相关的课程/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '清除搜索' }));
+    expect(screen.getByText(/没有找到「不存在」/)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getAllByRole('button', { name: '清除搜索' })[0],
+    );
+    expect(screen.getAllByText('高等数学').length).toBeGreaterThan(0);
+  });
+
+  it('finds a course in another week and jumps to it', async () => {
+    renderSchedule('grid', {
+      snapshot: {
+        ...SNAPSHOT,
+        courses: [{ ...COURSE, weeks: [12] }],
+      },
+    });
+    const search = screen.getByLabelText('搜索全部课程、教师、教室或校区');
+    await userEvent.type(search, 'MATH101');
+    expect(
+      screen.getByText('1 门课程 · 1 次安排'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /高等数学 第 12 周/ }),
+    );
+    expect(screen.getAllByText('第 12 周').length).toBeGreaterThan(0);
     expect(screen.getAllByText('高等数学').length).toBeGreaterThan(0);
   });
 

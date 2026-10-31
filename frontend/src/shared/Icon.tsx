@@ -48,6 +48,7 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   check: <path d="m5 12 4 4L19 6" />,
+  collapse: <path d="m14 6-6 6 6 6" />,
 };
 
 interface IconProps {

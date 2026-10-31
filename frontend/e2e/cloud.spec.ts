@@ -41,7 +41,7 @@ function fixtureSnapshot() {
 
   return {
     schema_version: 2,
-    app_version: '1.4.0',
+    app_version: '1.5.0',
     synced_at: now,
     sync_interval_days: 1,
     current_term: '2026-2027-1',

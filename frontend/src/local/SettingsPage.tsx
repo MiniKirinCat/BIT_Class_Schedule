@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import type { AppMode, ThemeName } from '../types';
+import type { AppMode, SidebarState, ThemeName } from '../types';
 import type {
   AppSettings,
   AppStatus,
@@ -40,6 +40,8 @@ interface SettingsPageProps {
   onModeChange: (mode: AppMode) => void;
   theme: ThemeName;
   onThemeChange: (theme: ThemeName) => void;
+  sidebar: SidebarState;
+  onToggleSidebar: () => void;
   onRelogin: () => void;
   onSync: () => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -53,6 +55,8 @@ export function SettingsPage({
   onModeChange,
   theme,
   onThemeChange,
+  sidebar,
+  onToggleSidebar,
   onRelogin,
   onSync,
   onRefresh,
@@ -315,18 +319,18 @@ export function SettingsPage({
           <div className="eyebrow">APPEARANCE</div>
           <h2>外观</h2>
           <p className="section-note">
-            四套配色共用纸页布局与衬线标题，只会改变色彩；深色模式跟随系统。
-            课程颜色保持稳定，换主题后仍能快速认出同一门课。
+            四套主题会同时改变标题字体、圆角和课程色；正文保持统一。
+            选择按设备记忆，深色模式跟随系统。
           </p>
           <ThemePicker value={theme} onChange={onThemeChange} />
         </section>
 
-        <section className="settings-section card">
+        <section className="settings-section card desktop-layout-section">
           <div className="eyebrow">DESKTOP LAYOUT</div>
           <h2>桌面形态</h2>
           <p className="section-note">
-            工作台保留周概览、下一节和变动侧栏；专注模式收起侧栏与右侧信息，
-            只留下今天的时间线。桌面模式只影响宽屏，手机端始终使用底部导航。
+            工作台保留周概览、下一节和变动侧栏；专注模式自动折叠侧栏与右栏。
+            手动折叠按设备记忆，退出专注后恢复。
           </p>
           <div className="settings-actions">
             <button
@@ -343,7 +347,16 @@ export function SettingsPage({
             >
               专注
             </button>
+            <button
+              type="button"
+              className="settings-button"
+              disabled={mode === 'focus'}
+              onClick={onToggleSidebar}
+            >
+              {sidebar === 'collapsed' ? '展开侧栏' : '收起侧栏'}
+            </button>
           </div>
+          <p className="form-hint">手机端始终使用底部导航，不显示桌面模式切换。</p>
         </section>
 
       <section className="settings-section">
@@ -420,7 +433,75 @@ export function SettingsPage({
       </section>
 
       <section className="settings-section">
-        <h3>诊断</h3>
+        <h3>微信提醒</h3>
+        <div className="settings-row">
+          <span>Server酱</span>
+          <span className={`settings-value ${settings?.push_configured ? 'is-ok' : 'is-alert'}`}>
+            {settings?.push_configured ? '已配置' : '未配置'}
+          </span>
+        </div>
+        <div className="settings-row">
+          <span>变动提醒</span>
+          <button
+            type="button"
+            className="button"
+            disabled={!settings || busy}
+            onClick={() => void patch({ push_enabled: !settings?.push_enabled })}
+          >
+            {settings?.push_enabled ? '已启用' : '已停用'}
+          </button>
+        </div>
+        {status.notification_error && (
+          <p className="form-error">{status.notification_error}</p>
+        )}
+        <form className="form" onSubmit={savePush}>
+          <label className="form-field">
+            <span className="form-label">Server酱 SendKey</span>
+            <input
+              className="input"
+              type="password"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              autoComplete="off"
+              placeholder={
+                settings?.push_configured
+                  ? '输入新的 SendKey 可替换'
+                  : '粘贴 SCT 开头的 SendKey'
+              }
+            />
+          </label>
+          <div className="form-actions">
+            <button type="submit" className="button button-primary" disabled={busy}>
+              保存并测试
+            </button>
+            <button
+              type="button"
+              className="button"
+              disabled={busy || !settings?.push_configured}
+              onClick={() => void testNotification()}
+            >
+              发送测试提醒
+            </button>
+          </div>
+          <p className="form-hint">
+            <a href="https://sct.ftqq.com/" target="_blank" rel="noreferrer">
+              获取 Server酱 SendKey
+            </a>
+            。免费会员每天 5 条，测试消息也会占用额度。SendKey 只保存在 Windows
+            凭据管理器，不会回显完整值。
+          </p>
+        </form>
+      </section>
+
+      <details className="settings-section advanced-card">
+        <summary>
+          <span>
+            <span className="eyebrow">DIAGNOSTICS</span>
+            <h3>诊断</h3>
+          </span>
+          <span className="details-cue" aria-hidden="true">详情</span>
+        </summary>
+        <div className="advanced-body">
         <p className="form-hint">
           用于排查真实账号登录和同步问题。诊断信息只在本机生成，不包含学号、密码、
           SendKey、GitHub token 或快照密钥，也不会自动上传。
@@ -485,71 +566,18 @@ export function SettingsPage({
             ))
           )}
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section className="settings-section">
-        <h3>微信提醒</h3>
-        <div className="settings-row">
-          <span>Server酱</span>
-          <span className={`settings-value ${settings?.push_configured ? 'is-ok' : 'is-alert'}`}>
-            {settings?.push_configured ? '已配置' : '未配置'}
+      <details className="settings-section advanced-card">
+        <summary>
+          <span>
+            <span className="eyebrow">CLOUD SNAPSHOT</span>
+            <h3>云端快照</h3>
           </span>
-        </div>
-        <div className="settings-row">
-          <span>变动提醒</span>
-          <button
-            type="button"
-            className="button"
-            disabled={!settings || busy}
-            onClick={() => void patch({ push_enabled: !settings?.push_enabled })}
-          >
-            {settings?.push_enabled ? '已启用' : '已停用'}
-          </button>
-        </div>
-        {status.notification_error && (
-          <p className="form-error">{status.notification_error}</p>
-        )}
-        <form className="form" onSubmit={savePush}>
-          <label className="form-field">
-            <span className="form-label">Server酱 SendKey</span>
-            <input
-              className="input"
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              autoComplete="off"
-              placeholder={
-                settings?.push_configured
-                  ? '输入新的 SendKey 可替换'
-                  : '粘贴 SCT 开头的 SendKey'
-              }
-            />
-          </label>
-          <div className="form-actions">
-            <button type="submit" className="button button-primary" disabled={busy}>
-              保存并测试
-            </button>
-            <button
-              type="button"
-              className="button"
-              disabled={busy || !settings?.push_configured}
-              onClick={() => void testNotification()}
-            >
-              发送测试提醒
-            </button>
-          </div>
-          <p className="form-hint">
-            <a href="https://sct.ftqq.com/" target="_blank" rel="noreferrer">
-              获取 Server酱 SendKey
-            </a>
-            。免费会员每天 5 条，测试消息也会占用额度。SendKey 只保存在 Windows
-            凭据管理器，不会回显完整值。
-          </p>
-        </form>
-      </section>
-
-      <section className="settings-section">
-        <h3>云端快照</h3>
+          <span className="details-cue" aria-hidden="true">详情</span>
+        </summary>
+        <div className="advanced-body">
         <div className="settings-row">
           <span>发布状态</span>
           <span className={`settings-value ${status.cloud_configured ? 'is-ok' : 'is-alert'}`}>
@@ -655,10 +683,18 @@ export function SettingsPage({
             完成配置并至少发布一次后，这里会显示手机配对二维码。
           </p>
         )}
-      </section>
+        </div>
+      </details>
 
-      <section className="settings-section">
-        <h3>启动与退出</h3>
+      <details className="settings-section advanced-card">
+        <summary>
+          <span>
+            <span className="eyebrow">STARTUP</span>
+            <h3>启动与退出</h3>
+          </span>
+          <span className="details-cue" aria-hidden="true">详情</span>
+        </summary>
+        <div className="advanced-body">
         <div className="settings-row">
           <span>开机时启动托盘</span>
           <span className={`settings-value ${startup?.enabled ? 'is-ok' : 'is-alert'}`}>
@@ -689,10 +725,18 @@ export function SettingsPage({
           托盘图标可以打开下一节、立即同步、查看日志，并直接“退出并停止服务”，
           不需要再运行停止脚本。
         </p>
-      </section>
+        </div>
+      </details>
 
-      <section className="settings-section">
-        <h3>关于</h3>
+      <details className="settings-section advanced-card">
+        <summary>
+          <span>
+            <span className="eyebrow">ABOUT</span>
+            <h3>关于</h3>
+          </span>
+          <span className="details-cue" aria-hidden="true">详情</span>
+        </summary>
+        <div className="advanced-body">
         <div className="settings-row">
           <span>版本</span>
           <span className="settings-value">{status.version}</span>
@@ -775,7 +819,8 @@ export function SettingsPage({
           应用只监听 127.0.0.1。云端只读页面由 GitHub Pages 提供，不包含教务账号或
           GitHub token。
         </p>
-      </section>
+        </div>
+      </details>
       </div>
     </section>
   );

@@ -12,6 +12,7 @@ import type {
   PageKey,
   PageMeta,
   ScheduleArchive,
+  SidebarState,
   ThemeName,
   WeekLayout,
 } from '../types';
@@ -101,6 +102,12 @@ export function CloudApp() {
     'paper',
     THEME_NAMES,
   );
+  const [sidebar, setSidebar] = useStoredChoice<SidebarState>(
+    STORAGE_KEYS.sidebar,
+    'expanded',
+    ['expanded', 'collapsed'] as const,
+  );
+  const themeTimer = useRef<number | null>(null);
 
   useAppShortcuts({ onNavigate: setPage, cloudMode: true });
 
@@ -109,8 +116,31 @@ export function CloudApp() {
   }, [mode]);
 
   useEffect(() => {
+    document.documentElement.dataset.sidebar = sidebar;
+  }, [sidebar]);
+
+  useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  const changeTheme = useCallback(
+    (next: ThemeName) => {
+      const root = document.documentElement;
+      root.classList.add('is-theme-switching');
+      if (themeTimer.current) window.clearTimeout(themeTimer.current);
+      themeTimer.current = window.setTimeout(
+        () => root.classList.remove('is-theme-switching'),
+        460,
+      );
+      setTheme(next);
+    },
+    [setTheme],
+  );
+
+  const toggleSidebar = useCallback(() => {
+    if (mode === 'focus') return;
+    setSidebar(sidebar === 'collapsed' ? 'expanded' : 'collapsed');
+  }, [mode, setSidebar, sidebar]);
 
   useEffect(() => {
     if (page !== 'schedule') setScheduleMeta(null);
@@ -242,6 +272,7 @@ export function CloudApp() {
     setMode('workbench');
     setWeekLayout(defaultWeekLayout());
     setTheme('paper');
+    setSidebar('expanded');
     setLastSeenId(0);
     setConfig(null);
     setArchive(null);
@@ -256,7 +287,7 @@ export function CloudApp() {
     setPage('today');
     setLoading(false);
     setInitialized(true);
-  }, [setMode, setWeekLayout, setTheme]);
+  }, [setMode, setSidebar, setWeekLayout, setTheme]);
 
   const refresh = useCallback(() => {
     if (config && !loadingRef.current) void load(config);
@@ -412,7 +443,7 @@ export function CloudApp() {
         refreshBusy={loading}
         onModeChange={setMode}
         onWeekLayoutChange={setWeekLayout}
-        onThemeChange={setTheme}
+        onThemeChange={changeTheme}
         onRefresh={refresh}
         onDisconnect={disconnect}
       />
@@ -485,6 +516,8 @@ export function CloudApp() {
         onChooseTerm={() => setTermSheet(true)}
         mode={mode}
         onModeChange={setMode}
+        sidebar={sidebar}
+        onToggleSidebar={toggleSidebar}
         unreadCount={unread}
         cached={fromCache}
         banner={banner}

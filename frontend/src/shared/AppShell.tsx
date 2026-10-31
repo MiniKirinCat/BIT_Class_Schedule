@@ -5,6 +5,7 @@ import type {
   PageKey,
   PageMeta,
   ScheduleSnapshot,
+  SidebarState,
 } from '../types';
 import { formatDateTime } from '../lib/schedule';
 import { BottomNav } from './BottomNav';
@@ -21,6 +22,8 @@ interface AppShellProps {
   onChooseTerm?: () => void;
   mode?: AppMode;
   onModeChange?: (mode: AppMode) => void;
+  sidebar?: SidebarState;
+  onToggleSidebar?: () => void;
   unreadCount?: number;
   status?: AppStatus | null;
   cached?: boolean;
@@ -82,6 +85,8 @@ export function AppShell({
   onChooseTerm,
   mode = 'workbench',
   onModeChange,
+  sidebar = 'expanded',
+  onToggleSidebar,
   unreadCount = 0,
   status = null,
   cached = false,
@@ -100,6 +105,8 @@ export function AppShell({
   const sync = syncState({ snapshot, status, cached, syncing });
   const syncShort = sync.time.slice(-5);
   const showSyncButton = !cloudMode && Boolean(onSync);
+  const sidebarCollapsed = sidebar === 'collapsed' || mode === 'focus';
+  const badgeLabel = unreadCount > 9 ? '9+' : String(unreadCount);
 
   const brand = (
     <div className="brand-block">
@@ -151,13 +158,15 @@ export function AppShell({
                   key={key}
                   type="button"
                   className={`nav-item ${page === key ? 'is-active' : ''}`}
+                  aria-label={item.label}
+                  title={item.label}
                   aria-current={page === key ? 'page' : undefined}
                   onClick={() => onNavigate(key)}
                 >
                   <Icon name={item.icon} />
                   <span>{item.label}</span>
                   {key === 'changes' && unreadCount > 0 ? (
-                    <span className="nav-badge">{unreadCount}</span>
+                    <span className="nav-badge">{badgeLabel}</span>
                   ) : (
                     <span className="nav-marker" />
                   )}
@@ -165,6 +174,32 @@ export function AppShell({
               );
             })}
           </nav>
+
+          {onToggleSidebar && (
+            <button
+              type="button"
+              className={`side-collapse ${sidebarCollapsed ? 'is-collapsed' : ''}`}
+              aria-label={
+                mode === 'focus'
+                  ? '专注模式已自动折叠侧栏'
+                  : sidebarCollapsed
+                    ? '展开侧栏'
+                    : '收起侧栏'
+              }
+              title={
+                mode === 'focus'
+                  ? '专注模式已自动折叠侧栏'
+                  : sidebarCollapsed
+                    ? '展开侧栏'
+                    : '收起侧栏'
+              }
+              disabled={mode === 'focus'}
+              onClick={onToggleSidebar}
+            >
+              <Icon name="collapse" />
+              <span>{sidebarCollapsed ? '展开侧栏' : '收起侧栏'}</span>
+            </button>
+          )}
 
           <div className="side-note">
             <span className="side-note-label">A QUIET COMPANION</span>
